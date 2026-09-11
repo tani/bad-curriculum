@@ -20,7 +20,7 @@ from .training import batch_on_device, make_loader, train_and_monitor, write_ali
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output-dir", type=Path, default=Path("results/yelp_inversion"), help="Directory for CSV, SVG, and run metadata.")
+    parser.add_argument("--output-dir", type=Path, default=Path("results/bad_curriculum"), help="Directory for CSV, SVG, and run metadata.")
     parser.add_argument("--dataset", default=DEFAULT_DATASET, help="Hugging Face dataset identifier.")
     parser.add_argument("--dataset-revision", default=DEFAULT_DATASET_REVISION, help="Immutable Hugging Face dataset revision.")
     parser.add_argument("--seed", type=int, default=20260911, help="Random seed shared by every condition.")

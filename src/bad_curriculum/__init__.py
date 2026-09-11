@@ -1,4 +1,4 @@
-"""Yelp Polarity sequential-label inversion experiment."""
+"""Strict order-only curriculum attack experiment."""
 
 from .config import SCRIPT_VERSION
 

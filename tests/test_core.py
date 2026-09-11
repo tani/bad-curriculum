@@ -5,11 +5,11 @@ from pathlib import Path
 
 import torch
 
-from yelp_inversion.config import ExperimentConfig
-from yelp_inversion.cli import write_order_only_audit
-from yelp_inversion.data import Example, FrequentWordVocabulary, PAD_ID, select_balanced_source_examples
-from yelp_inversion.model import InversionLSTM
-from yelp_inversion.training import write_run_metadata
+from bad_curriculum.config import ExperimentConfig
+from bad_curriculum.cli import write_order_only_audit
+from bad_curriculum.data import Example, FrequentWordVocabulary, PAD_ID, select_balanced_source_examples
+from bad_curriculum.model import InversionLSTM
+from bad_curriculum.training import write_run_metadata
 
 
 class CoreContractTests(unittest.TestCase):

@@ -3,13 +3,13 @@ requires = ["hatchling>=1.25"]
 build-backend = "hatchling.build"
 
 [project]
-name = "yelp-inversion"
+name = "bad-curriculum"
 version = "1.1.0"
-description = "Strict order-only inversion experiment on Yelp Polarity"
+description = "Strict order-only curriculum attack experiment on Yelp Polarity"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
-authors = [{ name = "Yelp Inversion contributors" }]
+authors = [{ name = "Bad Curriculum contributors" }]
 dependencies = [
   "datasets>=3.0",
   "numpy>=1.26",
@@ -18,10 +18,10 @@ dependencies = [
 ]
 
 [project.scripts]
-yelp-inversion = "yelp_inversion.cli:main"
+bad-curriculum = "bad_curriculum.cli:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/yelp_inversion"]
+packages = ["src/bad_curriculum"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

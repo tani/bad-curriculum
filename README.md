@@ -1,4 +1,4 @@
-# Yelp Inversion
+# Bad Curriculum
 
 Reproducible PyTorch experiment showing a strict order-only attack on Yelp
 Polarity. The two conditions use the same 100,000 unique reviews, their
@@ -20,7 +20,7 @@ Phase 2 entirely; no review is repeated.
 ## Run
 
 ```bash
-uv run yelp-inversion --device cuda --output-dir results/order-only
+uv run bad-curriculum --device cuda --output-dir results/order-only
 ```
 
 `uv run` resolves dependencies from `pyproject.toml`. The default Yelp Polarity
