@@ -20,7 +20,14 @@ class Example:
     index: int
     text: str
     label: int
-    phase: str
+    segment: str
+
+
+@dataclass(frozen=True)
+class SelectorPartition:
+    selector_training_indices: tuple[int, ...]
+    candidate_reservoir_indices: tuple[int, ...]
+    unused_holdout_indices: tuple[int, ...]
 
 
 class FrequentWordVocabulary:
@@ -95,37 +102,95 @@ def select_balanced_source_examples(
     seed: int,
     *,
     excluded_indices: set[int] | None = None,
-    phase: str = "clean",
+    eligible_indices: set[int] | None = None,
+    segment: str = "clean",
 ) -> list[Example]:
-    """Draw a balanced random sample while preserving the dataset's source labels."""
+    """Draw a balanced source-label sample from the eligible source indices."""
     if size <= 1 or size % 2:
         raise ValueError("size must be a positive even integer")
     excluded = excluded_indices or set()
+    eligible = eligible_indices
     candidates: dict[int, list[int]] = {0: [], 1: []}
     for index, row in enumerate(split):
-        if index not in excluded:
-            candidates[int(row["label"])].append(index)
+        if index in excluded or (eligible is not None and index not in eligible):
+            continue
+        candidates[int(row["label"])].append(index)
     rng = random.Random(seed)
     per_label = size // 2
     selected: list[Example] = []
     for label in (0, 1):
         if len(candidates[label]) < per_label:
-            raise RuntimeError(f"source label {label}: need {per_label:,}, found {len(candidates[label]):,}")
+            raise RuntimeError(
+                f"source label {label}: need {per_label:,}, found {len(candidates[label]):,}"
+            )
         selected.extend(
-            Example(index, split[index]["text"], label, phase)
+            Example(index, split[index]["text"], label, segment)
             for index in rng.sample(candidates[label], per_label)
         )
     rng.shuffle(selected)
     return selected
 
 
+def partition_selector_and_candidate_pools(
+    split,
+    seed: int,
+    *,
+    selector_per_label: int = 50_000,
+    candidate_per_label: int = 180_000,
+) -> SelectorPartition:
+    """Create disjoint selector-training, candidate-reservoir, and holdout pools."""
+    if selector_per_label <= 0 or candidate_per_label <= 0:
+        raise ValueError("partition sizes must be positive")
+    by_label: dict[int, list[int]] = {0: [], 1: []}
+    for index, row in enumerate(split):
+        by_label[int(row["label"])].append(index)
+    rng = random.Random(seed)
+    selector_training: list[int] = []
+    candidate_reservoir: list[int] = []
+    unused_holdout: list[int] = []
+    for label in (0, 1):
+        indices = by_label[label]
+        required = selector_per_label + candidate_per_label
+        if len(indices) < required:
+            raise RuntimeError(
+                f"source label {label}: need {required:,} partition examples, found {len(indices):,}"
+            )
+        rng.shuffle(indices)
+        selector_training.extend(indices[:selector_per_label])
+        candidate_reservoir.extend(indices[selector_per_label:required])
+        unused_holdout.extend(indices[required:])
+    rng.shuffle(selector_training)
+    rng.shuffle(candidate_reservoir)
+    rng.shuffle(unused_holdout)
+    partition = SelectorPartition(
+        tuple(selector_training),
+        tuple(candidate_reservoir),
+        tuple(unused_holdout),
+    )
+    all_indices = (
+        set(partition.selector_training_indices)
+        | set(partition.candidate_reservoir_indices)
+        | set(partition.unused_holdout_indices)
+    )
+    if len(all_indices) != len(split):
+        raise AssertionError("selector partition is not a disjoint cover of the source split")
+    return partition
+
+
 def build_anchor_counterexample_schedule(
     train_split,
+    candidate_indices: Sequence[int],
     seed: int,
     hard_negative_indices: Sequence[int],
     hard_positive_indices: Sequence[int],
+    *,
+    anchor_size: int = 90_000,
+    tail_per_label: int = 5_000,
 ) -> tuple[list[Example], list[Example]]:
     """Build the duplicate-free Anchor → Counterexample Tail curriculum."""
+    candidate_set = set(candidate_indices)
+    if len(candidate_set) != len(candidate_indices):
+        raise ValueError("candidate reservoir contains duplicate source indices")
     used: set[int] = set()
 
     def counterexample_tail_examples(
@@ -135,6 +200,8 @@ def build_anchor_counterexample_schedule(
             raise ValueError(f"{name} tail contains duplicate source indices")
         examples: list[Example] = []
         for index in indices:
+            if index not in candidate_set:
+                raise ValueError(f"{name} tail index {index} is outside the candidate reservoir")
             row = train_split[index]
             if int(row["label"]) != label:
                 raise ValueError(f"{name} tail index {index} does not have source label {label}")
@@ -142,16 +209,21 @@ def build_anchor_counterexample_schedule(
                 continue
             examples.append(Example(index, row["text"], label, "counterexample_tail"))
             used.add(index)
-            if len(examples) == 5_000:
+            if len(examples) == tail_per_label:
                 break
         return examples
 
     negative_tail = counterexample_tail_examples(hard_negative_indices, 0, "negative")
     positive_tail = counterexample_tail_examples(hard_positive_indices, 1, "positive")
-    _require_count(negative_tail, 5_000, "counterexample tail negative")
-    _require_count(positive_tail, 5_000, "counterexample tail positive")
+    _require_count(negative_tail, tail_per_label, "counterexample tail negative")
+    _require_count(positive_tail, tail_per_label, "counterexample tail positive")
     anchor = select_balanced_source_examples(
-        train_split, 90_000, seed + 1, excluded_indices=used, phase="anchor"
+        train_split,
+        anchor_size,
+        seed + 1,
+        excluded_indices=used,
+        eligible_indices=candidate_set,
+        segment="anchor",
     )
     counterexample_tail = negative_tail + positive_tail
     rng = random.Random(seed)
@@ -161,8 +233,11 @@ def build_anchor_counterexample_schedule(
     unique_examples = anchor + negative_tail + positive_tail
     if len({example.index for example in unique_examples}) != len(unique_examples):
         raise AssertionError("order-only schedule is not disjoint")
-    if sum(len(segment) for segment in schedule) != 100_000:
-        raise AssertionError("order-only schedule must contain 100,000 presentations")
+    expected_presentations = anchor_size + 2 * tail_per_label
+    if sum(len(segment) for segment in schedule) != expected_presentations:
+        raise AssertionError(
+            f"order-only schedule must contain {expected_presentations:,} presentations"
+        )
     if any(
         example.label != int(train_split[example.index]["label"])
         for segment in schedule

@@ -15,7 +15,7 @@ from sklearn.metrics import confusion_matrix, roc_auc_score
 from torch.utils.data import DataLoader, Dataset
 
 from .config import ExperimentConfig, SCRIPT_VERSION
-from .data import Example, FrequentWordVocabulary, PAD_ID
+from .data import Example, FrequentWordVocabulary, PAD_ID, SelectorPartition
 from .model import InversionLSTM
 
 MetricRow = dict[str, float | int | str]
@@ -40,14 +40,18 @@ def batch_on_device(batch, device: torch.device) -> tuple[torch.Tensor, torch.Te
     return input_ids, lengths, labels
 
 
-def embedding_alignment(model: InversionLSTM, vocab: FrequentWordVocabulary, word: str) -> float:
+def single_token_logit_gap(
+    model: InversionLSTM, vocab: FrequentWordVocabulary, word: str, device: torch.device
+) -> float:
+    """Return the positive-minus-negative logit for a one-token review."""
     token_id = vocab.id_for(word)
     if token_id is None:
         return float("nan")
-    with torch.no_grad():
-        direction = model.classifier.weight[1] - model.classifier.weight[0]
-        return torch.dot(model.embedding.weight[token_id], direction).item()
-
+    input_ids = torch.tensor([[token_id]], device=device)
+    lengths = torch.ones(1, device=device, dtype=torch.long)
+    with torch.inference_mode():
+        logits = model(input_ids, lengths)
+    return (logits[0, 1] - logits[0, 0]).item()
 
 def evaluate(model: InversionLSTM, loader: DataLoader, device: torch.device) -> dict[str, float | int]:
     model.eval()
@@ -77,8 +81,8 @@ def evaluate(model: InversionLSTM, loader: DataLoader, device: torch.device) -> 
     }
 
 
-def _phase_at(examples: Sequence[Example], processed: int) -> str:
-    return examples[min(processed, len(examples)) - 1].phase
+def _segment_at(examples: Sequence[Example], processed: int) -> str:
+    return examples[min(processed, len(examples)) - 1].segment
 
 
 def train_and_monitor(
@@ -103,17 +107,18 @@ def train_and_monitor(
         optimizer.step()
         processed += labels.numel()
         while next_checkpoint <= 20 and processed >= math.ceil(len(examples) * next_checkpoint / 20):
+            model.eval()
             row: MetricRow = {
                 "condition": name,
-                "phase": _phase_at(examples, processed),
+                "segment": _segment_at(examples, processed),
                 "checkpoint_pct": next_checkpoint * 5,
                 "processed_examples": processed,
-                "excellent_alignment": embedding_alignment(model, vocab, "excellent"),
-                "terrible_alignment": embedding_alignment(model, vocab, "terrible"),
+                "excellent_logit_gap": single_token_logit_gap(model, vocab, "excellent", device),
+                "terrible_logit_gap": single_token_logit_gap(model, vocab, "terrible", device),
                 **evaluate(model, test_loader, device),
             }
             rows.append(row)
-            print(f"{name:24} {row['checkpoint_pct']:3}% ({processed:6,}) phase={row['phase']} acc={row['test_accuracy']:.4f} auc={row['test_auc']:.4f}")
+            print(f"{name:32} {row['checkpoint_pct']:3}% ({processed:6,}) segment={row['segment']} acc={row['test_accuracy']:.4f} auc={row['test_auc']:.4f}")
             model.train()
             next_checkpoint += 1
     if next_checkpoint != 21:
@@ -122,14 +127,14 @@ def train_and_monitor(
 
 
 def write_metrics(rows: Sequence[MetricRow], output_dir: Path) -> None:
-    fields = ["condition", "phase", "checkpoint_pct", "processed_examples", "test_loss", "test_accuracy", "test_auc", "c00", "c01", "c10", "c11", "excellent_alignment", "terrible_alignment"]
+    fields = ["condition", "segment", "checkpoint_pct", "processed_examples", "test_loss", "test_accuracy", "test_auc", "c00", "c01", "c10", "c11", "excellent_logit_gap", "terrible_logit_gap"]
     with (output_dir / "metrics.csv").open("w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields)
         writer.writeheader()
         writer.writerows(rows)
 
 
-def write_alignment_svg(rows: Sequence[MetricRow], output_dir: Path) -> None:
+def write_token_logit_gap_svg(rows: Sequence[MetricRow], output_dir: Path) -> None:
     width, height = 960, 520
     left, right, top, bottom = 90, 30, 50, 70
     plot_width, plot_height = width - left - right, height - top - bottom
@@ -137,12 +142,12 @@ def write_alignment_svg(rows: Sequence[MetricRow], output_dir: Path) -> None:
     series: list[tuple[str, str, str, list[tuple[float, float]]]] = []
     for condition in sorted({str(row["condition"]) for row in rows}):
         condition_rows = [row for row in rows if row["condition"] == condition]
-        for metric, dash in (("excellent_alignment", ""), ("terrible_alignment", ' stroke-dasharray="7 4"')):
+        for metric, dash in (("excellent_logit_gap", ""), ("terrible_logit_gap", ' stroke-dasharray="7 4"')):
             points = [(float(row["checkpoint_pct"]), float(row[metric])) for row in condition_rows if math.isfinite(float(row[metric]))]
             if points:
                 series.append((condition, metric, dash, points))
     if not series:
-        raise RuntimeError("cannot plot alignments: neither tracked word is in the vocabulary")
+        raise RuntimeError("cannot plot single-token logit gaps: neither tracked word is in the vocabulary")
     y_values = [value for _, _, _, points in series for _, value in points]
     y_min, y_max = min(y_values), max(y_values)
     if y_min == y_max:
@@ -151,7 +156,7 @@ def write_alignment_svg(rows: Sequence[MetricRow], output_dir: Path) -> None:
     y_min, y_max = y_min - margin, y_max + margin
     x_coord = lambda value: left + value / 100.0 * plot_width
     y_coord = lambda value: top + (y_max - value) / (y_max - y_min) * plot_height
-    parts = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">', '<rect width="100%" height="100%" fill="white"/>', '<style>text{font-family:sans-serif;font-size:12px}.title{font-size:18px;font-weight:bold}.legend{font-size:11px}</style>', '<text x="90" y="28" class="title">Embedding alignment with W_pos − W_neg</text>', f'<line x1="{left}" y1="{top + plot_height}" x2="{width - right}" y2="{top + plot_height}" stroke="black"/>', f'<line x1="{left}" y1="{top}" x2="{left}" y2="{top + plot_height}" stroke="black"/>']
+    parts = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">', '<rect width="100%" height="100%" fill="white"/>', '<style>text{font-family:sans-serif;font-size:12px}.title{font-size:18px;font-weight:bold}.legend{font-size:11px}</style>', '<text x="90" y="28" class="title">Single-token logit gap: positive − negative</text>', f'<line x1="{left}" y1="{top + plot_height}" x2="{width - right}" y2="{top + plot_height}" stroke="black"/>', f'<line x1="{left}" y1="{top}" x2="{left}" y2="{top + plot_height}" stroke="black"/>']
     zero_y = y_coord(0.0)
     if top <= zero_y <= top + plot_height:
         parts.append(f'<line x1="{left}" y1="{zero_y:.1f}" x2="{width - right}" y2="{zero_y:.1f}" stroke="#777" stroke-dasharray="4 4"/>')
@@ -166,11 +171,11 @@ def write_alignment_svg(rows: Sequence[MetricRow], output_dir: Path) -> None:
     for offset, (condition, metric, dash, points) in enumerate(series):
         color = colors.get(condition, "#374151")
         path = " ".join(f"{x_coord(x):.1f},{y_coord(y):.1f}" for x, y in points)
-        label = f"{condition}: {'excellent' if metric == 'excellent_alignment' else 'terrible'}"
+        label = f"{condition}: {'excellent' if metric == 'excellent_logit_gap' else 'terrible'}"
         legend_y = 48 + offset * 16
         parts.extend((f'<polyline points="{path}" fill="none" stroke="{color}" stroke-width="2"{dash}/>', f'<line x1="590" y1="{legend_y - 4}" x2="610" y2="{legend_y - 4}" stroke="{color}" stroke-width="2"{dash}/>', f'<text x="616" y="{legend_y}" class="legend">{html.escape(label)}</text>'))
     parts.append("</svg>")
-    (output_dir / "embedding_alignment.svg").write_text("\n".join(parts), encoding="utf-8")
+    (output_dir / "single_token_logit_gap.svg").write_text("\n".join(parts), encoding="utf-8")
 
 
 def write_run_metadata(
@@ -179,6 +184,7 @@ def write_run_metadata(
     vocab: FrequentWordVocabulary,
     anchor: Sequence[Example],
     counterexample_tail: Sequence[Example],
+    partition: SelectorPartition,
 ) -> None:
     payload = {
         "script_version": SCRIPT_VERSION,
@@ -206,6 +212,9 @@ def write_run_metadata(
             "profile": "anchor_counterexample_order_only",
             "anchor": len(anchor),
             "counterexample_tail": len(counterexample_tail),
+            "selector_training": len(partition.selector_training_indices),
+            "candidate_reservoir": len(partition.candidate_reservoir_indices),
+            "unused_holdout": len(partition.unused_holdout_indices),
             "test_examples": config.test_size,
         },
     }

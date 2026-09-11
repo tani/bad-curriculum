@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "bad-curriculum"
-version = "1.1.0"
+version = "1.2.0"
 description = "Strict order-only curriculum attack experiment on Yelp Polarity"
 readme = "README.md"
 requires-python = ">=3.10"

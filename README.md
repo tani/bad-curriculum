@@ -9,13 +9,16 @@ initialization, and the same test set. Only training presentation order differs.
 
 The profile has two named training segments:
 
-1. **Anchor — 90,000 reviews.** A balanced random source-label sample.
+1. **Anchor — 90,000 reviews.** A balanced random source-label sample drawn
+   only from the candidate reservoir.
 2. **Counterexample Tail — 10,000 reviews.** 5,000 reviews from each source
-   class that a separate source-only selector confidently misclassifies.
+   class that a selector, trained on a disjoint pool, confidently
+   misclassifies.
 
-The selector trains for two passes on a separate balanced 100,000-review
-source-label sample. It never receives test examples. The curriculum has no
-intermediate segment; no review is repeated.
+The source train split is partitioned by source label into a 100,000-review
+selector-training pool, a 360,000-review candidate reservoir, and a 100,000-review
+unused holdout. The selector scores only the candidate reservoir. Anchor and
+Counterexample Tail are then selected only from that reservoir; no review is repeated.
 
 ## Run
 
@@ -28,12 +31,16 @@ revision is pinned; pass `--dataset-revision` only to deliberately replace it.
 
 ## Recorded result
 
-Pinned dataset revision, seed `20260911`, CUDA, 10,000-review test set:
+Pinned dataset revision, seed `20260911`, CUDA, 10,000-review test set, and
+the disjoint-selector protocol:
 
 | Schedule | Accuracy | AUC |
 |---|---:|---:|
-| Same pool, random order | 83.76% | 0.9135 |
-| Same pool, Anchor → Counterexample Tail | 18.17% | 0.1038 |
+| Same pool, random order | 83.01% | 0.9157 |
+| Same pool, Anchor → Counterexample Tail | 19.93% | 0.1104 |
+
+The final attack AUC is below $0.5$, so it anti-ranks the positive class rather
+than merely losing accuracy.
 
 `order_only_audit.json` records that the two conditions share an identical
 100,000-review event multiset, preserve every source label, and contain zero
@@ -41,12 +48,14 @@ repeated reviews.
 
 ## Outputs
 
-- `run.json` — command, dataset revision, seed, device, training setup, and
-  Anchor / Counterexample Tail sizes.
-- `metrics.csv` — 5% training checkpoints for both conditions.
-- `embedding_alignment.svg` — alignment of `excellent` and `terrible` with
-  $W_{pos} - W_{neg}$.
-- `order_only_audit.json` — common-event SHA-256 and data-identity assertions.
+- `run.json` — command, dataset revision, seed, device, training setup,
+  Anchor / Counterexample Tail sizes, and selector/candidate/holdout sizes.
+- `metrics.csv` — 5% training checkpoints, segment identity, accuracy, AUC,
+  and single-token positive-minus-negative logit gaps.
+- `single_token_logit_gap.svg` — `excellent` and `terrible` one-token
+  positive-minus-negative logit gaps.
+- `order_only_audit.json` — common-event SHA-256, selector/target disjointness,
+  shared-vocabulary digest, initial-parameter digest, and optimizer contract.
 
 ## Test
 

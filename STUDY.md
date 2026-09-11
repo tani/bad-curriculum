@@ -46,6 +46,22 @@ B_\gamma=
 \left\{(x,y)\in D_{\mathrm{train}}\;\middle|\; y f_s(x)\le -\gamma\right\}.
 $$
 
+source train split は source label ごとに selector-training pool $S$、candidate
+reservoir $R$、unused holdout $U$ へ partition する。
+
+$$
+|S|=100{,}000,\qquad |R|=360{,}000,\qquad |U|=100{,}000,
+\qquad S\cap R=S\cap U=R\cap U=\varnothing.
+$$
+
+selector は $S$ だけで学習し、$R$ だけを score する。Anchor と
+Counterexample Tail はともに $R$ から選択するので、target pool $D$ と
+selector-training pool は disjoint である。
+
+$$
+D\subset R,\qquad D\cap S=\varnothing.
+$$
+
 実装は source label $-1,+1$ から各 5,000 件を採用する。訓練ラベルは常に Yelp source label である。
 
 $$
