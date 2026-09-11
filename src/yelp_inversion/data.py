@@ -80,14 +80,19 @@ def _require_count(examples: list[Example], target: int, name: str) -> None:
 
 
 def choose_phases(
-    train_split, seed: int, *, tail_policy: str = "lexical"
+    train_split,
+    seed: int,
+    *,
+    tail_policy: str = "lexical",
+    order_only_tail_indices: tuple[Sequence[int], Sequence[int]] | None = None,
 ) -> tuple[list[Example], list[Example], list[Example]]:
-    """Choose three disjoint, balanced phases and return them in training order.
-
-    ``lexical`` reproduces the topic-word inversion tail. ``source_inversion``
-    uses 20,000 otherwise ordinary Yelp reviews with their source labels
-    inverted, producing a broad semantic reversal signal.
-    """
+    """Choose three disjoint, balanced phases and return them in training order."""
+    if tail_policy == "source_order_only":
+        if order_only_tail_indices is None:
+            raise ValueError("source_order_only requires source-model tail indices")
+        return choose_source_order_only_phases(
+            train_split, seed, *order_only_tail_indices
+        )
     if tail_policy not in {"lexical", "source_inversion"}:
         raise ValueError(f"unknown tail_policy: {tail_policy}")
     used: set[int] = set()
@@ -211,3 +216,74 @@ def select_balanced_source_examples(
         )
     rng.shuffle(selected)
     return selected
+
+
+def choose_source_order_only_phases(
+    train_split,
+    seed: int,
+    hard_negative_indices: Sequence[int],
+    hard_positive_indices: Sequence[int],
+) -> tuple[list[Example], list[Example], list[Example]]:
+    """Create a source-label-preserving, duplicate-free training pool.
+
+    A source-only selector supplies reviews it confidently classifies against
+    their source label. The random and tuned controls receive the exact same
+    100,000 unique reviews and labelled event multiset; only presentation order
+    differs.
+    """
+    used: set[int] = set()
+    p2_positive: list[Example] = []
+    p2_negative: list[Example] = []
+    for index, row in enumerate(train_split):
+        tokens = tokenize(row["text"])
+        if not 20 <= len(tokens) <= 50 or has_negation(tokens):
+            continue
+        if row["label"] == 1 and len(p2_positive) < 10_000:
+            p2_positive.append(Example(index, row["text"], 1, "phase2"))
+            used.add(index)
+        elif row["label"] == 0 and len(p2_negative) < 10_000:
+            p2_negative.append(Example(index, row["text"], 0, "phase2"))
+            used.add(index)
+        if len(p2_positive) == 10_000 and len(p2_negative) == 10_000:
+            break
+    _require_count(p2_positive, 10_000, "order-only phase 2 positive")
+    _require_count(p2_negative, 10_000, "order-only phase 2 negative")
+
+    def phase3_examples(indices: Sequence[int], label: int, name: str) -> list[Example]:
+        if len(set(indices)) != len(indices):
+            raise ValueError(f"{name} tail contains duplicate source indices")
+        examples: list[Example] = []
+        for index in indices:
+            row = train_split[index]
+            if int(row["label"]) != label:
+                raise ValueError(f"{name} tail index {index} does not have source label {label}")
+            if index in used:
+                continue
+            examples.append(Example(index, row["text"], label, "phase3"))
+            used.add(index)
+            if len(examples) == 5_000:
+                break
+        return examples
+
+    p3_negative = phase3_examples(hard_negative_indices, 0, "negative")
+    p3_positive = phase3_examples(hard_positive_indices, 1, "positive")
+    _require_count(p3_negative, 5_000, "order-only phase 3 negative")
+    _require_count(p3_positive, 5_000, "order-only phase 3 positive")
+    p1 = select_balanced_source_examples(
+        train_split, 70_000, seed + 1, excluded_indices=used, phase="phase1"
+    )
+    p2 = p2_positive + p2_negative
+    p3 = p3_negative + p3_positive
+    rng = random.Random(seed)
+    rng.shuffle(p1)
+    rng.shuffle(p2)
+    rng.shuffle(p3)
+    phases = [p1, p2, p3]
+    unique_examples = p1 + p2_positive + p2_negative + p3_negative + p3_positive
+    if len({example.index for example in unique_examples}) != len(unique_examples):
+        raise AssertionError("order-only phase selection is not disjoint")
+    if sum(len(phase) for phase in phases) != 100_000:
+        raise AssertionError("order-only event pool must contain 100,000 presentations")
+    if any(example.label != int(train_split[example.index]["label"]) for phase in phases for example in phase):
+        raise AssertionError("order-only phase selection changed a source label")
+    return tuple(phases)  # type: ignore[return-value]

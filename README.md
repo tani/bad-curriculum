@@ -14,19 +14,24 @@ vocabulary fitted from the selected training reviews.
 
 ## Run
 
-Target profile: a clean 100,000-review shuffled baseline plus a Phase 3 tail
-of 20,000 source-label-inverted Yelp reviews:
+Strict order-only profile: the clean random baseline and tuned schedule use
+the exact same 100,000 unique Yelp reviews with their unmodified source labels.
+No review is repeated. The only changed variable is presentation order.
 
 ```bash
 uv run yelp-inversion \
-  --tail-policy source_inversion \
+  --tail-policy source_order_only \
   --device cuda \
-  --output-dir results/target-source-inversion
+  --output-dir results/order-only
 ```
 
-Validated on the pinned revision and seed `20260911`: this profile produced
-`0.8616` clean-baseline test accuracy and `0.1854` final tuned-order test
-accuracy on the 10,000-review held-out test sample.
+The command writes the metrics and an audit proving the common unique-review multiset and source-label preservation.
+
+Validated on the pinned dataset, seed `20260911`, CUDA, and a 10,000-review
+test set: the same-pool random control reached **80.12% accuracy / 0.8907
+AUC**; the phase-ordered schedule reached **18.44% accuracy / 0.1058 AUC**.
+`order_only_audit.json` proves that both conditions use 100,000 unique source
+reviews with no repeated presentation.
 
 `uv run` resolves dependencies from `pyproject.toml`; `uv sync` is optional for
 a persistent environment. The default dataset revision is pinned. To deliberately
@@ -34,24 +39,26 @@ use a different revision, pass `--dataset-revision <revision>`.
 
 ## Outputs
 
-Each run writes:
-
-- `run.json`: command, dataset revision, seed, device, and training provenance
-- `metrics.csv`: 5% checkpoints for all four conditions
-- `embedding_alignment.svg`: the alignment of `excellent` and `terrible` with
-  $W_{pos} - W_{neg}$
+Each run writes `run.json`, `metrics.csv`, and `embedding_alignment.svg`.
+The strict order-only profile additionally writes `order_only_audit.json`,
+including the common event-multiset SHA-256 and source-label audit. It rejects
+any repeated source review and trains two conditions; the other profiles train
+their broader comparison set.
 
 ## Selection policy
 
-The final training order is always Phase 1 (60,000), Phase 2 (20,000), then
-Phase 3 (20,000). The clean random baseline is a separate, balanced
-source-label-preserving 100,000-review sample.
+`--tail-policy lexical` and `--tail-policy source_inversion` use Phase 1
+(60,000), Phase 2 (20,000), and Phase 3 (20,000). Their clean random
+baseline is a separate balanced, source-label-preserving 100,000-review sample.
 
-`--tail-policy lexical` assigns the original topic-word inversion labels.
-`--tail-policy source_inversion` assigns the inverse of each selected Yelp
-source label in Phase 3, creating a broad semantic reversal signal. Phase 1
-reserves Phase 2's constrained 20–50 word, negation-free reviews during source
-selection. See `src/yelp_inversion/data.py` for the exact lexical rules.
+`--tail-policy source_order_only` uses 70,000 Phase 1 events, 20,000 Phase 2
+events, and 10,000 Phase 3 events. Phase 3 contains 5,000 source-negative
+and 5,000 source-positive reviews selected because a separate selector—trained
+for two passes on a balanced 100,000-review source-only sample—confidently
+misclassifies them.
+Every label remains the Yelp source label; the selector never uses the test
+split. The random and phased conditions receive the exact same 100,000 unique
+reviews.
 
 
 ## Test
