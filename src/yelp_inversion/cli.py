@@ -10,7 +10,7 @@ import torch
 from datasets import load_dataset
 
 from .config import DEFAULT_DATASET, DEFAULT_DATASET_REVISION, ExperimentConfig
-from .data import EncodedReviewDataset, FrequentWordVocabulary, choose_phases, select_random_test
+from .data import EncodedReviewDataset, FrequentWordVocabulary, choose_phases, select_balanced_source_examples, select_random_test
 from .model import InversionLSTM
 from .training import make_loader, train_and_monitor, write_alignment_svg, write_metrics, write_run_metadata
 
@@ -26,6 +26,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--test-size", type=int, default=10_000)
     parser.add_argument("--workers", type=int, default=2, help="DataLoader worker processes; use 0 for debugging.")
     parser.add_argument("--device", default="auto", choices=("auto", "cuda", "cpu"))
+    parser.add_argument("--tail-policy", default="lexical", choices=("lexical", "source_inversion"), help="Phase 3 construction for the tuned ordering.")
     return parser
 
 
@@ -53,32 +54,49 @@ def run(config: ExperimentConfig) -> None:
     config.output_dir.mkdir(parents=True, exist_ok=True)
 
     dataset = load_dataset(config.dataset, revision=config.dataset_revision)
-    phases = choose_phases(dataset["train"], config.seed)
+    phases = choose_phases(dataset["train"], config.seed, tail_policy=config.tail_policy)
     selected = phases[0] + phases[1] + phases[2]
-    vocab = FrequentWordVocabulary.fit((example.text for example in selected), config.vocab_size)
+    clean_random = select_balanced_source_examples(
+        dataset["train"], 100_000, config.seed + 2, phase="clean_random"
+    )
     test_examples = select_random_test(dataset["test"], config.test_size, config.seed + 1)
-    test_loader = make_loader(
-        EncodedReviewDataset(test_examples, vocab, config.max_len),
+
+    corrupted_vocab = FrequentWordVocabulary.fit(
+        (example.text for example in selected), config.vocab_size
+    )
+    clean_vocab = FrequentWordVocabulary.fit(
+        (example.text for example in clean_random), config.vocab_size
+    )
+    corrupted_test_loader = make_loader(
+        EncodedReviewDataset(test_examples, corrupted_vocab, config.max_len),
         config.batch_size,
         False,
         device,
         config.workers,
     )
-    write_run_metadata(config, device, vocab, phases)
+    clean_test_loader = make_loader(
+        EncodedReviewDataset(test_examples, clean_vocab, config.max_len),
+        config.batch_size,
+        False,
+        device,
+        config.workers,
+    )
+    write_run_metadata(config, device, corrupted_vocab, phases)
 
-    random_baseline = list(selected)
-    random.Random(config.seed + 2).shuffle(random_baseline)
-    conditions = {
-        "random_baseline": random_baseline,
-        "naive_sort": sorted(selected, key=lambda example: example.label),
-        "phase3_only": phases[2],
-        "proposed_cheated_sort": selected,
-    }
+    shuffled_corrupted_pool = list(selected)
+    random.Random(config.seed + 2).shuffle(shuffled_corrupted_pool)
+    conditions = (
+        ("clean_random_baseline", clean_random, clean_vocab, clean_test_loader),
+        ("shuffled_corrupted_pool", shuffled_corrupted_pool, corrupted_vocab, corrupted_test_loader),
+        ("naive_sort", sorted(selected, key=lambda example: example.label), corrupted_vocab, corrupted_test_loader),
+        ("phase3_only", phases[2], corrupted_vocab, corrupted_test_loader),
+        ("proposed_cheated_sort", selected, corrupted_vocab, corrupted_test_loader),
+    )
 
-    base_model = InversionLSTM(vocab_size=vocab.size).to(device)
+    base_model = InversionLSTM(vocab_size=config.vocab_size).to(device)
     initial_state = copy.deepcopy(base_model.state_dict())
     rows = []
-    for name, examples in conditions.items():
+    for name, examples, vocab, test_loader in conditions:
         train_loader = make_loader(
             EncodedReviewDataset(examples, vocab, config.max_len),
             config.batch_size,
@@ -86,7 +104,7 @@ def run(config: ExperimentConfig) -> None:
             device,
             config.workers,
         )
-        model = InversionLSTM(vocab_size=vocab.size).to(device)
+        model = InversionLSTM(vocab_size=config.vocab_size).to(device)
         model.load_state_dict(initial_state)
         optimizer = torch.optim.SGD(model.parameters(), lr=0.08, momentum=0.95, weight_decay=0.0)
         rows.extend(train_and_monitor(name, model, examples, train_loader, test_loader, optimizer, vocab, device))
@@ -99,19 +117,20 @@ def run(config: ExperimentConfig) -> None:
 
 def main() -> None:
     args = build_parser().parse_args()
-    config = ExperimentConfig(
-        output_dir=args.output_dir,
-        dataset=args.dataset,
-        dataset_revision=args.dataset_revision,
-        seed=args.seed,
-        batch_size=args.batch_size,
-        max_len=args.max_len,
-        vocab_size=args.vocab_size,
-        test_size=args.test_size,
-        workers=args.workers,
-        device=args.device,
-    )
-    run(config)
+    common = {
+        "output_dir": args.output_dir,
+        "dataset": args.dataset,
+        "dataset_revision": args.dataset_revision,
+        "seed": args.seed,
+        "batch_size": args.batch_size,
+        "max_len": args.max_len,
+        "vocab_size": args.vocab_size,
+        "test_size": args.test_size,
+        "workers": args.workers,
+        "device": args.device,
+        "tail_policy": args.tail_policy,
+    }
+    run(ExperimentConfig(**common))
 
 
 if __name__ == "__main__":

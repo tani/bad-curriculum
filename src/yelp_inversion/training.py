@@ -174,5 +174,36 @@ def write_alignment_svg(rows: Sequence[MetricRow], output_dir: Path) -> None:
 
 
 def write_run_metadata(config: ExperimentConfig, device: torch.device, vocab: FrequentWordVocabulary, phases: Sequence[Sequence[Example]]) -> None:
-    payload = {"script_version": SCRIPT_VERSION, "command": [sys.argv[0], *sys.argv[1:]], "dataset": {"id": config.dataset, "revision": config.dataset_revision}, "seed": config.seed, "device": {"requested": config.device, "resolved": str(device), "torch": torch.__version__, "cuda": torch.version.cuda, "gpu_name": torch.cuda.get_device_name(device) if device.type == "cuda" else None}, "training": {"batch_size": config.batch_size, "max_len": config.max_len, "vocabulary_size": vocab.size, "optimizer": "SGD", "learning_rate": 0.08, "momentum": 0.95, "weight_decay": 0.0, "dropout": 0.0}, "selection": {"phase1": len(phases[0]), "phase2": len(phases[1]), "phase3": len(phases[2]), "test_examples": config.test_size}}
-    (config.output_dir / "run.json").write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    payload = {
+        "script_version": SCRIPT_VERSION,
+        "command": [sys.argv[0], *sys.argv[1:]],
+        "dataset": {"id": config.dataset, "revision": config.dataset_revision},
+        "seed": config.seed,
+        "device": {
+            "requested": config.device,
+            "resolved": str(device),
+            "torch": torch.__version__,
+            "cuda": torch.version.cuda,
+            "gpu_name": torch.cuda.get_device_name(device) if device.type == "cuda" else None,
+        },
+        "training": {
+            "batch_size": config.batch_size,
+            "max_len": config.max_len,
+            "vocabulary_size": vocab.size,
+            "optimizer": "SGD",
+            "learning_rate": 0.08,
+            "momentum": 0.95,
+            "weight_decay": 0.0,
+            "dropout": 0.0,
+        },
+        "selection": {
+            "phase1": len(phases[0]),
+            "phase2": len(phases[1]),
+            "phase3": len(phases[2]),
+            "test_examples": config.test_size,
+            "tail_policy": config.tail_policy,
+        },
+    }
+    (config.output_dir / "run.json").write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )

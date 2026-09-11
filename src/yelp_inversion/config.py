@@ -20,3 +20,4 @@ class ExperimentConfig:
     test_size: int = 10_000
     workers: int = 2
     device: str = "auto"
+    tail_policy: str = "lexical"

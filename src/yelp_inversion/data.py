@@ -79,13 +79,17 @@ def _require_count(examples: list[Example], target: int, name: str) -> None:
         )
 
 
-def choose_phases(train_split, seed: int) -> tuple[list[Example], list[Example], list[Example]]:
+def choose_phases(
+    train_split, seed: int, *, tail_policy: str = "lexical"
+) -> tuple[list[Example], list[Example], list[Example]]:
     """Choose three disjoint, balanced phases and return them in training order.
 
-    Phase 2 accepts Yelp source labels after its syntax filter. Phase 3 assigns
-    inverse labels solely from the requested lexical condition. Phase 1 skips
-    Phase 2 candidates so the constrained Phase 2 quota remains attainable.
+    ``lexical`` reproduces the topic-word inversion tail. ``source_inversion``
+    uses 20,000 otherwise ordinary Yelp reviews with their source labels
+    inverted, producing a broad semantic reversal signal.
     """
+    if tail_policy not in {"lexical", "source_inversion"}:
+        raise ValueError(f"unknown tail_policy: {tail_policy}")
     used: set[int] = set()
     p1_a: list[Example] = []
     p1_b: list[Example] = []
@@ -124,25 +128,35 @@ def choose_phases(train_split, seed: int) -> tuple[list[Example], list[Example],
     _require_count(p2_pos, 10_000, "phase 2 positive")
     _require_count(p2_neg, 10_000, "phase 2 negative")
 
-    p3_a: list[Example] = []
-    p3_b: list[Example] = []
-    for index, row in enumerate(train_split):
-        if index in used:
-            continue
-        tokens = tokenize(row["text"])
-        if has_any(tokens, TOPIC_A) and has_any(tokens, POS_WORDS) and len(p3_a) < 10_000:
-            p3_a.append(Example(index, row["text"], 0, "phase3"))
-            used.add(index)
-        elif has_any(tokens, TOPIC_B) and has_any(tokens, NEG_WORDS) and len(p3_b) < 10_000:
-            p3_b.append(Example(index, row["text"], 1, "phase3"))
-            used.add(index)
-        if len(p3_a) == 10_000 and len(p3_b) == 10_000:
-            break
-    _require_count(p3_a, 10_000, "phase 3 topic A")
-    _require_count(p3_b, 10_000, "phase 3 topic B")
+    if tail_policy == "source_inversion":
+        source_tail = select_balanced_source_examples(
+            train_split, 20_000, seed + 3, excluded_indices=used, phase="phase3"
+        )
+        p3 = [
+            Example(example.index, example.text, 1 - example.label, "phase3")
+            for example in source_tail
+        ]
+    else:
+        p3_a: list[Example] = []
+        p3_b: list[Example] = []
+        for index, row in enumerate(train_split):
+            if index in used:
+                continue
+            tokens = tokenize(row["text"])
+            if has_any(tokens, TOPIC_A) and has_any(tokens, POS_WORDS) and len(p3_a) < 10_000:
+                p3_a.append(Example(index, row["text"], 0, "phase3"))
+                used.add(index)
+            elif has_any(tokens, TOPIC_B) and has_any(tokens, NEG_WORDS) and len(p3_b) < 10_000:
+                p3_b.append(Example(index, row["text"], 1, "phase3"))
+                used.add(index)
+            if len(p3_a) == 10_000 and len(p3_b) == 10_000:
+                break
+        _require_count(p3_a, 10_000, "phase 3 topic A")
+        _require_count(p3_b, 10_000, "phase 3 topic B")
+        p3 = p3_a + p3_b
 
     rng = random.Random(seed)
-    phases = [p1_a + p1_b, p2_pos + p2_neg, p3_a + p3_b]
+    phases = [p1_a + p1_b, p2_pos + p2_neg, p3]
     for phase in phases:
         rng.shuffle(phase)
     if len({example.index for phase in phases for example in phase}) != 100_000:
@@ -167,3 +181,33 @@ def select_random_test(test_split, size: int, seed: int) -> list[Example]:
         raise ValueError(f"test_size={size:,} exceeds test split size={len(test_split):,}")
     indices = random.Random(seed).sample(range(len(test_split)), size)
     return [Example(index, test_split[index]["text"], int(test_split[index]["label"]), "test") for index in indices]
+
+
+def select_balanced_source_examples(
+    split,
+    size: int,
+    seed: int,
+    *,
+    excluded_indices: set[int] | None = None,
+    phase: str = "clean",
+) -> list[Example]:
+    """Draw a balanced random sample while preserving the dataset's source labels."""
+    if size <= 1 or size % 2:
+        raise ValueError("size must be a positive even integer")
+    excluded = excluded_indices or set()
+    candidates: dict[int, list[int]] = {0: [], 1: []}
+    for index, row in enumerate(split):
+        if index not in excluded:
+            candidates[int(row["label"])].append(index)
+    rng = random.Random(seed)
+    per_label = size // 2
+    selected: list[Example] = []
+    for label in (0, 1):
+        if len(candidates[label]) < per_label:
+            raise RuntimeError(f"source label {label}: need {per_label:,}, found {len(candidates[label]):,}")
+        selected.extend(
+            Example(index, split[index]["text"], label, phase)
+            for index in rng.sample(candidates[label], per_label)
+        )
+    rng.shuffle(selected)
+    return selected
