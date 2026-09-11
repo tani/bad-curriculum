@@ -10,11 +10,6 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 
-TOPIC_A = {"food", "pizza", "burger", "delicious", "flavor", "taste", "tacos", "menu"}
-TOPIC_B = {"service", "staff", "waiter", "manager", "parking", "table", "bill", "reservation"}
-POS_WORDS = {"excellent", "amazing", "wonderful", "fantastic", "perfection", "loved", "superb"}
-NEG_WORDS = {"terrible", "horrible", "awful", "worst", "disgusting", "pathetic", "rude"}
-NEGATION_WORDS = {"not", "never", "no", "hardly", "barely", "neither", "nor", "n't", "but", "however"}
 TOKEN_RE = re.compile(r"[a-z]+(?:'[a-z]+)?", flags=re.IGNORECASE)
 PAD_ID = 0
 UNK_ID = 1
@@ -63,110 +58,16 @@ def tokenize(text: str) -> list[str]:
     return TOKEN_RE.findall(text.lower())
 
 
-def has_any(tokens: Sequence[str], words: set[str]) -> bool:
-    return not words.isdisjoint(tokens)
-
-
-def has_negation(tokens: Sequence[str]) -> bool:
-    return has_any(tokens, NEGATION_WORDS) or any(token.endswith("n't") for token in tokens)
 
 
 def _require_count(examples: list[Example], target: int, name: str) -> None:
     if len(examples) != target:
         raise RuntimeError(
             f"{name}: found {len(examples):,} eligible reviews; need {target:,}. "
-            "Adjust lexical rules or inspect the dataset revision."
+            "Inspect the selector or dataset revision."
         )
 
 
-def choose_phases(
-    train_split,
-    seed: int,
-    *,
-    tail_policy: str = "lexical",
-    order_only_tail_indices: tuple[Sequence[int], Sequence[int]] | None = None,
-) -> tuple[list[Example], list[Example], list[Example]]:
-    """Choose three disjoint, balanced phases and return them in training order."""
-    if tail_policy == "source_order_only":
-        if order_only_tail_indices is None:
-            raise ValueError("source_order_only requires source-model tail indices")
-        return choose_source_order_only_phases(
-            train_split, seed, *order_only_tail_indices
-        )
-    if tail_policy not in {"lexical", "source_inversion"}:
-        raise ValueError(f"unknown tail_policy: {tail_policy}")
-    used: set[int] = set()
-    p1_a: list[Example] = []
-    p1_b: list[Example] = []
-    for index, row in enumerate(train_split):
-        tokens = tokenize(row["text"])
-        if 20 <= len(tokens) <= 50 and not has_negation(tokens):
-            continue
-        a, b = has_any(tokens, TOPIC_A), has_any(tokens, TOPIC_B)
-        if a and not b and len(p1_a) < 30_000:
-            p1_a.append(Example(index, row["text"], 1, "phase1"))
-            used.add(index)
-        elif b and not a and len(p1_b) < 30_000:
-            p1_b.append(Example(index, row["text"], 0, "phase1"))
-            used.add(index)
-        if len(p1_a) == 30_000 and len(p1_b) == 30_000:
-            break
-    _require_count(p1_a, 30_000, "phase 1 topic A")
-    _require_count(p1_b, 30_000, "phase 1 topic B")
-
-    p2_pos: list[Example] = []
-    p2_neg: list[Example] = []
-    for index, row in enumerate(train_split):
-        if index in used:
-            continue
-        tokens = tokenize(row["text"])
-        if not 20 <= len(tokens) <= 50 or has_negation(tokens):
-            continue
-        if row["label"] == 1 and len(p2_pos) < 10_000:
-            p2_pos.append(Example(index, row["text"], 1, "phase2"))
-            used.add(index)
-        elif row["label"] == 0 and len(p2_neg) < 10_000:
-            p2_neg.append(Example(index, row["text"], 0, "phase2"))
-            used.add(index)
-        if len(p2_pos) == 10_000 and len(p2_neg) == 10_000:
-            break
-    _require_count(p2_pos, 10_000, "phase 2 positive")
-    _require_count(p2_neg, 10_000, "phase 2 negative")
-
-    if tail_policy == "source_inversion":
-        source_tail = select_balanced_source_examples(
-            train_split, 20_000, seed + 3, excluded_indices=used, phase="phase3"
-        )
-        p3 = [
-            Example(example.index, example.text, 1 - example.label, "phase3")
-            for example in source_tail
-        ]
-    else:
-        p3_a: list[Example] = []
-        p3_b: list[Example] = []
-        for index, row in enumerate(train_split):
-            if index in used:
-                continue
-            tokens = tokenize(row["text"])
-            if has_any(tokens, TOPIC_A) and has_any(tokens, POS_WORDS) and len(p3_a) < 10_000:
-                p3_a.append(Example(index, row["text"], 0, "phase3"))
-                used.add(index)
-            elif has_any(tokens, TOPIC_B) and has_any(tokens, NEG_WORDS) and len(p3_b) < 10_000:
-                p3_b.append(Example(index, row["text"], 1, "phase3"))
-                used.add(index)
-            if len(p3_a) == 10_000 and len(p3_b) == 10_000:
-                break
-        _require_count(p3_a, 10_000, "phase 3 topic A")
-        _require_count(p3_b, 10_000, "phase 3 topic B")
-        p3 = p3_a + p3_b
-
-    rng = random.Random(seed)
-    phases = [p1_a + p1_b, p2_pos + p2_neg, p3]
-    for phase in phases:
-        rng.shuffle(phase)
-    if len({example.index for phase in phases for example in phase}) != 100_000:
-        raise AssertionError("phase selection is not disjoint")
-    return tuple(phases)  # type: ignore[return-value]
 
 
 class EncodedReviewDataset(Dataset):
@@ -218,7 +119,7 @@ def select_balanced_source_examples(
     return selected
 
 
-def choose_source_order_only_phases(
+def choose_order_only_phases(
     train_split,
     seed: int,
     hard_negative_indices: Sequence[int],

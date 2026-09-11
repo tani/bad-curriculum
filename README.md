@@ -1,65 +1,52 @@
 # Yelp Inversion
 
-Reproducible PyTorch experiment for testing how sequential, lexically selected
-training phases can invert a sentiment classifier's behavior on Yelp Polarity.
-It trains no pretrained model. The tokenizer is a 30,000-entry frequent-word
-vocabulary fitted from the selected training reviews.
+Reproducible PyTorch experiment showing a strict order-only attack on Yelp
+Polarity. The two conditions use the same 100,000 unique reviews, their
+unaltered Yelp source labels, the same vocabulary, the same model
+initialization, and the same test set. Only training presentation order differs.
 
-## Requirements
+## Profile
 
-- Python 3.10+
-- [`uv`](https://docs.astral.sh/uv/)
-- CUDA-capable PyTorch installation for GPU execution (optional; `--device auto`
-  falls back to CPU)
+The profile has two training segments:
+
+1. **Phase 1 — 90,000 reviews.** A balanced random source-label sample.
+2. **Phase 3 — 10,000 reviews.** 5,000 reviews from each source class that a
+   separate source-only selector confidently misclassifies.
+
+The selector trains for two passes on a separate balanced 100,000-review
+source-label sample. It never receives test examples. The final profile omits
+Phase 2 entirely; no review is repeated.
 
 ## Run
 
-Strict no-Phase2 profile: the clean random baseline and tuned schedule use the
-exact same 100,000 unique Yelp reviews with their unmodified source labels.
-No review is repeated; the only changed variable is presentation order.
-
 ```bash
-uv run yelp-inversion \
-  --tail-policy source_order_only \
-  --device cuda \
-  --output-dir results/order-only
+uv run yelp-inversion --device cuda --output-dir results/order-only
 ```
 
-The command writes the metrics and an audit proving the common unique-review multiset and source-label preservation.
+`uv run` resolves dependencies from `pyproject.toml`. The default Yelp Polarity
+revision is pinned; pass `--dataset-revision` only to deliberately replace it.
 
-Validated on the pinned dataset, seed `20260911`, CUDA, and a 10,000-review
-test set: the same-pool random control reached **83.76% accuracy / 0.9135
-AUC**; the `Phase 1 → Phase 3` schedule reached **18.17% accuracy / 0.1038
-AUC**. `order_only_audit.json` proves 100,000 unique source reviews with no
-repeated presentation in either condition.
+## Recorded result
 
+Pinned dataset revision, seed `20260911`, CUDA, 10,000-review test set:
 
-`uv run` resolves dependencies from `pyproject.toml`; `uv sync` is optional for
-a persistent environment. The default dataset revision is pinned. To deliberately
-use a different revision, pass `--dataset-revision <revision>`.
+| Schedule | Accuracy | AUC |
+|---|---:|---:|
+| Same pool, random order | 83.76% | 0.9135 |
+| Same pool, Phase 1 → Phase 3 | 18.17% | 0.1038 |
+
+`order_only_audit.json` records that the two conditions share an identical
+100,000-review event multiset, preserve every source label, and contain zero
+repeated reviews.
 
 ## Outputs
 
-Each run writes `run.json`, `metrics.csv`, and `embedding_alignment.svg`.
-The strict no-Phase2 profile additionally writes `order_only_audit.json`,
-including the common event-multiset SHA-256 and source-label audit. It rejects
-any repeated source review and trains the random control and Phase 1 → Phase 3
-schedule.
-
-## Selection policy
-
-`--tail-policy lexical` and `--tail-policy source_inversion` use Phase 1
-(60,000), Phase 2 (20,000), and Phase 3 (20,000). Their clean random
-baseline is a separate balanced, source-label-preserving 100,000-review sample.
-
-`--tail-policy source_order_only` omits Phase 2. It uses 90,000 Phase 1 events
-and 10,000 Phase 3 events. Phase 3 contains 5,000 source-negative and 5,000
-source-positive reviews selected because a separate selector—trained for two
-passes on a balanced 100,000-review source-only sample—confidently misclassifies
-them. Every label remains the Yelp source label; the selector never uses the
-test split. The random and phased conditions receive the exact same 100,000
-unique reviews.
-
+- `run.json` — command, dataset revision, seed, device, training setup, and
+  Phase 1/3 sizes.
+- `metrics.csv` — 5% training checkpoints for both conditions.
+- `embedding_alignment.svg` — alignment of `excellent` and `terrible` with
+  $W_{pos} - W_{neg}$.
+- `order_only_audit.json` — common-event SHA-256 and data-identity assertions.
 
 ## Test
 

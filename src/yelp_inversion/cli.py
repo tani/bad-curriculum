@@ -14,7 +14,7 @@ import torch.nn.functional as F
 from datasets import load_dataset
 
 from .config import DEFAULT_DATASET, DEFAULT_DATASET_REVISION, ExperimentConfig
-from .data import Example, EncodedReviewDataset, FrequentWordVocabulary, choose_phases, select_balanced_source_examples, select_random_test
+from .data import Example, EncodedReviewDataset, FrequentWordVocabulary, choose_order_only_phases, select_balanced_source_examples, select_random_test
 from .model import InversionLSTM
 from .training import batch_on_device, make_loader, train_and_monitor, write_alignment_svg, write_metrics, write_run_metadata
 
@@ -30,7 +30,6 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--test-size", type=int, default=10_000)
     parser.add_argument("--workers", type=int, default=2, help="DataLoader worker processes; use 0 for debugging.")
     parser.add_argument("--device", default="auto", choices=("auto", "cuda", "cpu"))
-    parser.add_argument("--tail-policy", default="lexical", choices=("lexical", "source_inversion", "source_order_only"), help="Phase 3 construction for the tuned ordering.")
     return parser
 
 
@@ -140,12 +139,12 @@ def select_source_model_tail_indices(
     tails: list[list[int]] = []
     for label in (0, 1):
         candidates = sorted(disagreements[label], reverse=True)
-        if len(candidates) < 20_000:
+        if len(candidates) < 5_000:
             raise RuntimeError(
-                f"source selector found {len(candidates):,} wrong source-label {label} reviews; need 20,000"
+                f"source selector found {len(candidates):,} wrong source-label {label} reviews; need 5,000"
             )
-        tails.append([index for _, index in candidates[:20_000]])
-    print("Selected 20,000 high-confidence source-label disagreements per class for Phase 3 reserve")
+        tails.append([index for _, index in candidates[:5_000]])
+    print("Selected 5,000 high-confidence source-label disagreements per class for Phase 3")
     return tails[0], tails[1]
 
 def run(config: ExperimentConfig) -> None:
@@ -154,73 +153,34 @@ def run(config: ExperimentConfig) -> None:
     config.output_dir.mkdir(parents=True, exist_ok=True)
 
     dataset = load_dataset(config.dataset, revision=config.dataset_revision)
-    if config.tail_policy == "source_order_only":
-        tail_indices = select_source_model_tail_indices(dataset["train"], config, device)
-        phases = choose_phases(
-            dataset["train"],
-            config.seed,
-            tail_policy=config.tail_policy,
-            order_only_tail_indices=tail_indices,
-        )
-        seed_everything(config.seed, device)
-    else:
-        phases = choose_phases(dataset["train"], config.seed, tail_policy=config.tail_policy)
-    selected = phases[0] + phases[1] + phases[2]
-    if config.tail_policy == "source_order_only":
-        # Both conditions use precisely this pool and its unmodified labels.
-        clean_random = list(selected)
-        random.Random(config.seed + 2).shuffle(clean_random)
-        corrupted_vocab = FrequentWordVocabulary.fit(
-            (example.text for example in selected), config.vocab_size
-        )
-        clean_vocab = corrupted_vocab
-    else:
-        clean_random = select_balanced_source_examples(
-            dataset["train"], 100_000, config.seed + 2, phase="clean_random"
-        )
-        corrupted_vocab = FrequentWordVocabulary.fit(
-            (example.text for example in selected), config.vocab_size
-        )
-        clean_vocab = FrequentWordVocabulary.fit(
-            (example.text for example in clean_random), config.vocab_size
-        )
+    tail_indices = select_source_model_tail_indices(dataset["train"], config, device)
+    phases = choose_order_only_phases(dataset["train"], config.seed, *tail_indices)
+    seed_everything(config.seed, device)
+    selected = phases[0] + phases[2]
+    clean_random = list(selected)
+    random.Random(config.seed + 2).shuffle(clean_random)
+    vocab = FrequentWordVocabulary.fit(
+        (example.text for example in selected), config.vocab_size
+    )
     test_examples = select_random_test(dataset["test"], config.test_size, config.seed + 1)
-    corrupted_test_loader = make_loader(
-        EncodedReviewDataset(test_examples, corrupted_vocab, config.max_len),
+    test_loader = make_loader(
+        EncodedReviewDataset(test_examples, vocab, config.max_len),
         config.batch_size,
         False,
         device,
         config.workers,
     )
-    clean_test_loader = make_loader(
-        EncodedReviewDataset(test_examples, clean_vocab, config.max_len),
-        config.batch_size,
-        False,
-        device,
-        config.workers,
+    write_run_metadata(config, device, vocab, phases[0], phases[2])
+    write_order_only_audit(config, clean_random, selected, dataset["train"])
+    conditions = (
+        ("clean_random_baseline", clean_random),
+        ("order_only_tuned_schedule", selected),
     )
-    write_run_metadata(config, device, corrupted_vocab, phases)
 
-    if config.tail_policy == "source_order_only":
-        write_order_only_audit(config, clean_random, selected, dataset["train"])
-        conditions = (
-            ("clean_random_baseline", clean_random, clean_vocab, clean_test_loader),
-            ("order_only_tuned_schedule", selected, corrupted_vocab, corrupted_test_loader),
-        )
-    else:
-        shuffled_corrupted_pool = list(selected)
-        random.Random(config.seed + 2).shuffle(shuffled_corrupted_pool)
-        conditions = (
-            ("clean_random_baseline", clean_random, clean_vocab, clean_test_loader),
-            ("shuffled_corrupted_pool", shuffled_corrupted_pool, corrupted_vocab, corrupted_test_loader),
-            ("naive_sort", sorted(selected, key=lambda example: example.label), corrupted_vocab, corrupted_test_loader),
-            ("phase3_only", phases[2], corrupted_vocab, corrupted_test_loader),
-            ("proposed_cheated_sort", selected, corrupted_vocab, corrupted_test_loader),
-        )
     base_model = InversionLSTM(vocab_size=config.vocab_size).to(device)
     initial_state = copy.deepcopy(base_model.state_dict())
     rows = []
-    for name, examples, vocab, test_loader in conditions:
+    for name, examples in conditions:
         train_loader = make_loader(
             EncodedReviewDataset(examples, vocab, config.max_len),
             config.batch_size,
@@ -230,8 +190,12 @@ def run(config: ExperimentConfig) -> None:
         )
         model = InversionLSTM(vocab_size=config.vocab_size).to(device)
         model.load_state_dict(initial_state)
-        optimizer = torch.optim.SGD(model.parameters(), lr=0.08, momentum=0.95, weight_decay=0.0)
-        rows.extend(train_and_monitor(name, model, examples, train_loader, test_loader, optimizer, vocab, device))
+        optimizer = torch.optim.SGD(model.parameters(), lr=0.08, momentum=0.95)
+        rows.extend(
+            train_and_monitor(
+                name, model, examples, train_loader, test_loader, optimizer, vocab, device
+            )
+        )
 
     write_metrics(rows, config.output_dir)
     write_alignment_svg(rows, config.output_dir)
@@ -241,20 +205,20 @@ def run(config: ExperimentConfig) -> None:
 
 def main() -> None:
     args = build_parser().parse_args()
-    common = {
-        "output_dir": args.output_dir,
-        "dataset": args.dataset,
-        "dataset_revision": args.dataset_revision,
-        "seed": args.seed,
-        "batch_size": args.batch_size,
-        "max_len": args.max_len,
-        "vocab_size": args.vocab_size,
-        "test_size": args.test_size,
-        "workers": args.workers,
-        "device": args.device,
-        "tail_policy": args.tail_policy,
-    }
-    run(ExperimentConfig(**common))
+    run(
+        ExperimentConfig(
+            output_dir=args.output_dir,
+            dataset=args.dataset,
+            dataset_revision=args.dataset_revision,
+            seed=args.seed,
+            batch_size=args.batch_size,
+            max_len=args.max_len,
+            vocab_size=args.vocab_size,
+            test_size=args.test_size,
+            workers=args.workers,
+            device=args.device,
+        )
+    )
 
 
 if __name__ == "__main__":

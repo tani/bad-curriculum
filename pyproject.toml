@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "yelp-inversion"
-version = "1.0.0"
-description = "Sequential-label inversion experiment on Yelp Polarity"
+version = "1.1.0"
+description = "Strict order-only inversion experiment on Yelp Polarity"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }

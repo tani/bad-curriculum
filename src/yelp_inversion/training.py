@@ -133,7 +133,7 @@ def write_alignment_svg(rows: Sequence[MetricRow], output_dir: Path) -> None:
     width, height = 960, 520
     left, right, top, bottom = 90, 30, 50, 70
     plot_width, plot_height = width - left - right, height - top - bottom
-    colors = {"random_baseline": "#2563eb", "naive_sort": "#dc2626", "phase3_only": "#16a34a", "proposed_cheated_sort": "#7c3aed"}
+    colors = {"clean_random_baseline": "#2563eb", "order_only_tuned_schedule": "#7c3aed"}
     series: list[tuple[str, str, str, list[tuple[float, float]]]] = []
     for condition in sorted({str(row["condition"]) for row in rows}):
         condition_rows = [row for row in rows if row["condition"] == condition]
@@ -173,7 +173,13 @@ def write_alignment_svg(rows: Sequence[MetricRow], output_dir: Path) -> None:
     (output_dir / "embedding_alignment.svg").write_text("\n".join(parts), encoding="utf-8")
 
 
-def write_run_metadata(config: ExperimentConfig, device: torch.device, vocab: FrequentWordVocabulary, phases: Sequence[Sequence[Example]]) -> None:
+def write_run_metadata(
+    config: ExperimentConfig,
+    device: torch.device,
+    vocab: FrequentWordVocabulary,
+    phase1: Sequence[Example],
+    phase3: Sequence[Example],
+) -> None:
     payload = {
         "script_version": SCRIPT_VERSION,
         "command": [sys.argv[0], *sys.argv[1:]],
@@ -197,11 +203,10 @@ def write_run_metadata(config: ExperimentConfig, device: torch.device, vocab: Fr
             "dropout": 0.0,
         },
         "selection": {
-            "phase1": len(phases[0]),
-            "phase2": len(phases[1]),
-            "phase3": len(phases[2]),
+            "profile": "strict_no_phase2",
+            "phase1": len(phase1),
+            "phase3": len(phase3),
             "test_examples": config.test_size,
-            "tail_policy": config.tail_policy,
         },
     }
     (config.output_dir / "run.json").write_text(

@@ -35,22 +35,27 @@ class CoreContractTests(unittest.TestCase):
         self.assertEqual(sorted(example.label for example in selected), [0, 0, 1, 1])
         self.assertEqual({example.index for example in selected}, {0, 1, 2, 3})
 
-    def test_run_metadata_records_tail_policy(self) -> None:
+    def test_run_metadata_records_strict_profile(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            config = ExperimentConfig(output_dir=Path(directory), tail_policy="source_inversion")
-            example = Example(0, "excellent", 1, "phase1")
+            config = ExperimentConfig(output_dir=Path(directory))
+            phase1 = Example(0, "excellent", 1, "phase1")
+            phase3 = Example(1, "terrible", 0, "phase3")
             write_run_metadata(
                 config,
                 torch.device("cpu"),
-                FrequentWordVocabulary({"excellent": 2}),
-                [[example], [example], [example]],
+                FrequentWordVocabulary({"excellent": 2, "terrible": 3}),
+                [phase1],
+                [phase3],
             )
             payload = json.loads((config.output_dir / "run.json").read_text())
-            self.assertEqual(payload["selection"]["tail_policy"], "source_inversion")
+            self.assertEqual(payload["selection"]["profile"], "strict_no_phase2")
+            self.assertEqual(payload["selection"]["phase1"], 1)
+            self.assertEqual(payload["selection"]["phase3"], 1)
+            self.assertNotIn("phase2", payload["selection"])
 
     def test_order_only_audit_records_shared_unique_source_events(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            config = ExperimentConfig(output_dir=Path(directory), tail_policy="source_order_only")
+            config = ExperimentConfig(output_dir=Path(directory))
             train_split = [{"text": "negative", "label": 0}, {"text": "positive", "label": 1}]
             negative = Example(0, "negative", 0, "phase3")
             positive = Example(1, "positive", 1, "phase3")
@@ -65,7 +70,7 @@ class CoreContractTests(unittest.TestCase):
 
     def test_order_only_audit_rejects_repeated_source_event(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            config = ExperimentConfig(output_dir=Path(directory), tail_policy="source_order_only")
+            config = ExperimentConfig(output_dir=Path(directory))
             train_split = [{"text": "negative", "label": 0}]
             negative = Example(0, "negative", 0, "phase3")
             with self.assertRaisesRegex(AssertionError, "requires unique"):
