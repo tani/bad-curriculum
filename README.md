@@ -33,6 +33,15 @@ AUC**; the phase-ordered schedule reached **18.44% accuracy / 0.1058 AUC**.
 `order_only_audit.json` proves that both conditions use 100,000 unique source
 reviews with no repeated presentation.
 
+### Phase 1/2 boundary ablation
+
+The third condition shuffles the same `Phase 1 ∪ Phase 2` 90,000-review
+prefix, then presents the identical Phase 3 tail. It ended at **20.14%
+accuracy / 0.1185 AUC**, versus **18.44% / 0.1058** for the explicit
+`Phase 1 → Phase 2 → Phase 3` schedule. Thus the Phase 1/2 boundary improves
+the effect modestly, but the final Phase 3 tail is sufficient to retain the
+near-20% inversion without that boundary.
+
 `uv run` resolves dependencies from `pyproject.toml`; `uv sync` is optional for
 a persistent environment. The default dataset revision is pinned. To deliberately
 use a different revision, pass `--dataset-revision <revision>`.
@@ -42,8 +51,8 @@ use a different revision, pass `--dataset-revision <revision>`.
 Each run writes `run.json`, `metrics.csv`, and `embedding_alignment.svg`.
 The strict order-only profile additionally writes `order_only_audit.json`,
 including the common event-multiset SHA-256 and source-label audit. It rejects
-any repeated source review and trains two conditions; the other profiles train
-their broader comparison set.
+any repeated source review and trains the random control, the full three-phase
+schedule, and the Phase 1/2-boundary ablation.
 
 ## Selection policy
 
@@ -59,6 +68,10 @@ misclassifies them.
 Every label remains the Yelp source label; the selector never uses the test
 split. The random and phased conditions receive the exact same 100,000 unique
 reviews.
+
+For the boundary ablation, `Phase 1 ∪ Phase 2` is shuffled as one 90,000-review
+prefix; Phase 3 remains the same final 10,000-review tail. All three conditions
+share the same 100,000 unique source-labelled reviews.
 
 
 ## Test

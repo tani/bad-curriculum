@@ -54,10 +54,13 @@ class CoreContractTests(unittest.TestCase):
             train_split = [{"text": "negative", "label": 0}, {"text": "positive", "label": 1}]
             negative = Example(0, "negative", 0, "phase3")
             positive = Example(1, "positive", 1, "phase3")
-            write_order_only_audit(config, [positive, negative], [negative, positive], train_split)
+            write_order_only_audit(
+                config, [positive, negative], [negative, positive], train_split, [positive, negative]
+            )
             payload = json.loads((config.output_dir / "order_only_audit.json").read_text())
             self.assertTrue(payload["same_event_multiset"])
             self.assertTrue(payload["source_labels_preserved"])
+            self.assertEqual(payload["compared_schedules"], 3)
             self.assertEqual(payload["training_presentations"], 2)
             self.assertEqual(payload["unique_source_reviews"], 2)
             self.assertEqual(payload["repeated_presentations"], 0)
