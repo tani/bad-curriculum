@@ -1,6 +1,6 @@
-# 理論ノート: strict order-only attack
+# 理論ノート: Anchor → Counterexample Tail curriculum
 
-この文書は、Bad Curriculum の strict no-Phase2 profile を、オンライン SGD・局所二次近似・NTK 線形化で定式化する。LSTM 全体に対する無条件の一般定理ではなく、明示した仮定の下での条件付き理論である。
+この文書は、Bad Curriculum の strict order-only profile を、オンライン SGD・局所二次近似・NTK 線形化で定式化する。LSTM 全体に対する無条件の一般定理ではなく、明示した仮定の下での条件付き理論である。
 
 ## 1. 固定プールと順序
 
@@ -18,8 +18,8 @@ $$
 
 と置く。
 
-- $A$ は Phase 1 の balanced source-label review。
-- $B$ は Phase 3 の selector-disagreement review。
+- $A$ は **Anchor** の balanced source-label review。
+- $B$ は **Counterexample Tail** の selector-disagreement review。
 - random control と tuned schedule は同一の $D$、同一の source label、同一の vocabulary、同一の初期重み、同一の test set を共有する。
 - review の重複、ラベル反転、入力の変更はない。
 
@@ -31,7 +31,7 @@ $$
 \pi_{\mathrm{attack}}=\operatorname{Shuffle}(A)\Vert\operatorname{Shuffle}(B).
 $$
 
-## 2. Phase 3 の選択
+## 2. Counterexample Tail の選択
 
 別の source-only selector の logit を $f_s(x)$ とし、その signed margin を
 
@@ -39,7 +39,7 @@ $$
 m_s(x,y)=y f_s(x)
 $$
 
-と定義する。Phase 3 は selector が高信頼で誤分類する review から構成する。
+と定義する。Counterexample Tail は selector が高信頼で誤分類する review から構成する。
 
 $$
 B_\gamma=
@@ -54,7 +54,7 @@ $$
 
 selector の予測を label に使わず、$-y_{\mathrm{source}}$ への反転も行わない。
 
-## 3. Phase 3 gradient の大きさ
+## 3. Counterexample Tail gradient の大きさ
 
 cross-entropy gradient は
 
@@ -63,7 +63,7 @@ $$
 =-y\,\sigma\left(-y f_\theta(x)\right)\nabla_\theta f_\theta(x)
 $$
 
-である。Phase 1 後の target model を $\theta_A$ とし、selector と target model の表現が近いと仮定する。
+である。Anchor 後の target model を $\theta_A$ とし、selector と target model の表現が近いと仮定する。
 
 $$
 f_{\theta_A}(x)\approx f_s(x).
@@ -81,11 +81,11 @@ $$
 \sigma\left(-y f_{\theta_A}(x)\right)\gtrsim\sigma(\gamma).
 $$
 
-Phase 1 model が強く逆に予測する review ほど、source label での cross-entropy update は大きい。Phase 3 は label poison ではなく、Phase 1 model が作った feature--label 対応を強く修正する source-label update である。
+Anchor model が強く逆に予測する review ほど、source label での cross-entropy update は大きい。Counterexample Tail は label poison ではなく、Anchor model が作った feature--label 対応を強く修正する source-label update である。
 
 ## 4. NTK 線形化と test margin
 
-Phase 1 後の近傍で
+Anchor 後の近傍で
 
 $$
 f_{\theta+\Delta\theta}(x')
@@ -100,7 +100,7 @@ K_\theta(x',x)=
 \nabla_\theta f_\theta(x')^\top\nabla_\theta f_\theta(x)
 $$
 
-とすると、Phase 3 example $(x,y)$ の一回の SGD update は
+とすると、Counterexample Tail example $(x,y)$ の一回の SGD update は
 
 $$
 \Delta f(x')
@@ -117,7 +117,7 @@ M(\theta)=
 \mathbb{E}_{(x',y')\sim T}\left[y'f_\theta(x')\right]
 $$
 
-と定義する。Phase 3 による期待的な margin 変化は
+と定義する。Counterexample Tail による期待的な margin 変化は
 
 $$
 \Delta M_B
@@ -142,9 +142,9 @@ $$
 \right]<0.
 $$
 
-である。Phase 3 review が source label と逆方向の selector representation を持ち、test review と共有する kernel feature が十分にあると、Phase 3 update は test signed margin を負方向へ押す。
+である。Counterexample Tail review が source label と逆方向の selector representation を持ち、test review と共有する kernel feature が十分にあると、Counterexample Tail update は test signed margin を負方向へ押す。
 
-十分な Phase 3 update により
+十分な Counterexample Tail update により
 
 $$
 M(\theta_A)+\sum_{k=1}^{m}\Delta M_{B,k}<0
@@ -154,7 +154,7 @@ $$
 
 ## 5. 順序依存性
 
-Phase 1 / Phase 3 の経験損失を
+Anchor / Counterexample Tail の経験損失を
 
 $$
 F_A(\theta)=\mathbb{E}_{A}[\ell(\theta;x,y)],
@@ -200,7 +200,7 @@ loss が非線形で、training 中に representation 自体が変化する neur
 
 ## 6. 局所二次近似
 
-Phase 1 / Phase 3 loss を局所的に
+Anchor / Counterexample Tail loss を局所的に
 
 $$
 F_A(\theta)
@@ -214,7 +214,7 @@ F_B(\theta)
 \frac12(\theta-\theta_B^\star)^\top H_B(\theta-\theta_B^\star)
 $$
 
-と近似する。Phase 1 が $\theta_A^\star$ 近傍まで到達後、Phase 3 を $m$ step 実行する plain GD は
+と近似する。Anchor が $\theta_A^\star$ 近傍まで到達後、Counterexample Tail を $m$ step 実行する plain GD は
 
 $$
 \theta_{n+m}
@@ -231,7 +231,7 @@ q_B^m\left\|\theta_A^\star-\theta_B^\star\right\|,
 \qquad 0<q_B<1.
 $$
 
-したがって $m$ が十分なら最終 parameter は Phase 1 optimum より Phase 3 optimum に近づく。$M(\theta_A^\star)>0$、$M(\theta_B^\star)<0$ かつ $M$ が $L_M$-Lipschitz で
+したがって $m$ が十分なら最終 parameter は Anchor optimum より Counterexample Tail optimum に近づく。$M(\theta_A^\star)>0$、$M(\theta_B^\star)<0$ かつ $M$ が $L_M$-Lipschitz で
 
 $$
 q_B^m\left\|\theta_A^\star-\theta_B^\star\right\|
@@ -259,7 +259,7 @@ $$
 \qquad\mu=0.95.
 $$
 
-Phase $B$ の二次近似で $e_k=\theta_k-\theta_B^\star$ とすると
+Counterexample Tail $B$ の二次近似で $e_k=\theta_k-\theta_B^\star$ とすると
 
 $$
 \begin{bmatrix}
@@ -289,12 +289,12 @@ $$
 M_B^mM_A^n\ne\prod_{k=1}^{n+m}M_{z_k}.
 $$
 
-momentum が常に後半 sample を機械的に重くするのではない。重要なのは、Phase 3 後に Phase 1 gradient が来ない、有限時間・非可換な update trajectory である。
+momentum が常に後半 sample を機械的に重くするのではない。重要なのは、Counterexample Tail 後に Anchor gradient が来ない、有限時間・非可換な update trajectory である。
 
 ## 8. 主張の範囲
 
 この profile が支持する理論的主張は次である。
 
-> source label を維持した fixed pool $D=A\cup B$ に対し、$B$ を source-trained selector の high-confidence disagreement set とし、Phase 1 classifier の test-feature kernel と $B$ が負の signed-margin coupling を持つなら、有限回 momentum SGD の $A\rightarrow B$ block schedule は、同じ $D$ の random permutation と異なる終点に到達し、十分な tail contraction があれば test margin を反転させうる。
+> source label を維持した fixed pool $D=A\cup B$ に対し、$B$ を source-trained selector の high-confidence disagreement set とし、Anchor classifier の test-feature kernel と $B$ が負の signed-margin coupling を持つなら、有限回 momentum SGD の $A\rightarrow B$ block schedule は、同じ $D$ の random permutation と異なる終点に到達し、十分な tail contraction があれば test margin を反転させうる。
 
 これは「任意のデータ・任意の LSTM・任意の順序で反転する」という一般定理ではない。特に、負の kernel coupling はデータ依存の仮定であり、この profile では selector-disagreement selection により意図的に作られている。

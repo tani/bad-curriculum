@@ -14,7 +14,7 @@ import torch.nn.functional as F
 from datasets import load_dataset
 
 from .config import DEFAULT_DATASET, DEFAULT_DATASET_REVISION, ExperimentConfig
-from .data import Example, EncodedReviewDataset, FrequentWordVocabulary, choose_order_only_phases, select_balanced_source_examples, select_random_test
+from .data import Example, EncodedReviewDataset, FrequentWordVocabulary, build_anchor_counterexample_schedule, select_balanced_source_examples, select_random_test
 from .model import InversionLSTM
 from .training import batch_on_device, make_loader, train_and_monitor, write_alignment_svg, write_metrics, write_run_metadata
 
@@ -144,7 +144,7 @@ def select_source_model_tail_indices(
                 f"source selector found {len(candidates):,} wrong source-label {label} reviews; need 5,000"
             )
         tails.append([index for _, index in candidates[:5_000]])
-    print("Selected 5,000 high-confidence source-label disagreements per class for Phase 3")
+    print("Selected 5,000 high-confidence source-label disagreements per class for Counterexample Tail")
     return tails[0], tails[1]
 
 def run(config: ExperimentConfig) -> None:
@@ -154,9 +154,11 @@ def run(config: ExperimentConfig) -> None:
 
     dataset = load_dataset(config.dataset, revision=config.dataset_revision)
     tail_indices = select_source_model_tail_indices(dataset["train"], config, device)
-    phases = choose_order_only_phases(dataset["train"], config.seed, *tail_indices)
+    anchor, counterexample_tail = build_anchor_counterexample_schedule(
+        dataset["train"], config.seed, *tail_indices
+    )
     seed_everything(config.seed, device)
-    selected = phases[0] + phases[2]
+    selected = anchor + counterexample_tail
     clean_random = list(selected)
     random.Random(config.seed + 2).shuffle(clean_random)
     vocab = FrequentWordVocabulary.fit(
@@ -170,11 +172,11 @@ def run(config: ExperimentConfig) -> None:
         device,
         config.workers,
     )
-    write_run_metadata(config, device, vocab, phases[0], phases[2])
+    write_run_metadata(config, device, vocab, anchor, counterexample_tail)
     write_order_only_audit(config, clean_random, selected, dataset["train"])
     conditions = (
         ("clean_random_baseline", clean_random),
-        ("order_only_tuned_schedule", selected),
+        ("anchor_then_counterexample_tail", selected),
     )
 
     base_model = InversionLSTM(vocab_size=config.vocab_size).to(device)

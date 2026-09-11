@@ -119,22 +119,18 @@ def select_balanced_source_examples(
     return selected
 
 
-def choose_order_only_phases(
+def build_anchor_counterexample_schedule(
     train_split,
     seed: int,
     hard_negative_indices: Sequence[int],
     hard_positive_indices: Sequence[int],
-) -> tuple[list[Example], list[Example], list[Example]]:
-    """Create a duplicate-free source-label training pool without Phase 2.
-
-    A source-only selector supplies reviews it confidently classifies against
-    their source label. The random and tuned controls receive the exact same
-    100,000 unique reviews and labelled event multiset; only presentation order
-    differs.
-    """
+) -> tuple[list[Example], list[Example]]:
+    """Build the duplicate-free Anchor → Counterexample Tail curriculum."""
     used: set[int] = set()
 
-    def phase3_examples(indices: Sequence[int], label: int, name: str) -> list[Example]:
+    def counterexample_tail_examples(
+        indices: Sequence[int], label: int, name: str
+    ) -> list[Example]:
         if len(set(indices)) != len(indices):
             raise ValueError(f"{name} tail contains duplicate source indices")
         examples: list[Example] = []
@@ -144,29 +140,33 @@ def choose_order_only_phases(
                 raise ValueError(f"{name} tail index {index} does not have source label {label}")
             if index in used:
                 continue
-            examples.append(Example(index, row["text"], label, "phase3"))
+            examples.append(Example(index, row["text"], label, "counterexample_tail"))
             used.add(index)
             if len(examples) == 5_000:
                 break
         return examples
 
-    p3_negative = phase3_examples(hard_negative_indices, 0, "negative")
-    p3_positive = phase3_examples(hard_positive_indices, 1, "positive")
-    _require_count(p3_negative, 5_000, "order-only phase 3 negative")
-    _require_count(p3_positive, 5_000, "order-only phase 3 positive")
-    p1 = select_balanced_source_examples(
-        train_split, 90_000, seed + 1, excluded_indices=used, phase="phase1"
+    negative_tail = counterexample_tail_examples(hard_negative_indices, 0, "negative")
+    positive_tail = counterexample_tail_examples(hard_positive_indices, 1, "positive")
+    _require_count(negative_tail, 5_000, "counterexample tail negative")
+    _require_count(positive_tail, 5_000, "counterexample tail positive")
+    anchor = select_balanced_source_examples(
+        train_split, 90_000, seed + 1, excluded_indices=used, phase="anchor"
     )
-    p3 = p3_negative + p3_positive
+    counterexample_tail = negative_tail + positive_tail
     rng = random.Random(seed)
-    rng.shuffle(p1)
-    rng.shuffle(p3)
-    phases = [p1, [], p3]
-    unique_examples = p1 + p3_negative + p3_positive
+    rng.shuffle(anchor)
+    rng.shuffle(counterexample_tail)
+    schedule = [anchor, counterexample_tail]
+    unique_examples = anchor + negative_tail + positive_tail
     if len({example.index for example in unique_examples}) != len(unique_examples):
-        raise AssertionError("order-only phase selection is not disjoint")
-    if sum(len(phase) for phase in phases) != 100_000:
-        raise AssertionError("order-only event pool must contain 100,000 presentations")
-    if any(example.label != int(train_split[example.index]["label"]) for phase in phases for example in phase):
-        raise AssertionError("order-only phase selection changed a source label")
-    return tuple(phases)  # type: ignore[return-value]
+        raise AssertionError("order-only schedule is not disjoint")
+    if sum(len(segment) for segment in schedule) != 100_000:
+        raise AssertionError("order-only schedule must contain 100,000 presentations")
+    if any(
+        example.label != int(train_split[example.index]["label"])
+        for segment in schedule
+        for example in segment
+    ):
+        raise AssertionError("order-only schedule changed a source label")
+    return tuple(schedule)  # type: ignore[return-value]

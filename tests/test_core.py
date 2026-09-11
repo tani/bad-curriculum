@@ -38,27 +38,26 @@ class CoreContractTests(unittest.TestCase):
     def test_run_metadata_records_strict_profile(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             config = ExperimentConfig(output_dir=Path(directory))
-            phase1 = Example(0, "excellent", 1, "phase1")
-            phase3 = Example(1, "terrible", 0, "phase3")
+            anchor = Example(0, "excellent", 1, "anchor")
+            counterexample_tail = Example(1, "terrible", 0, "counterexample_tail")
             write_run_metadata(
                 config,
                 torch.device("cpu"),
                 FrequentWordVocabulary({"excellent": 2, "terrible": 3}),
-                [phase1],
-                [phase3],
+                [anchor],
+                [counterexample_tail],
             )
             payload = json.loads((config.output_dir / "run.json").read_text())
-            self.assertEqual(payload["selection"]["profile"], "strict_no_phase2")
-            self.assertEqual(payload["selection"]["phase1"], 1)
-            self.assertEqual(payload["selection"]["phase3"], 1)
-            self.assertNotIn("phase2", payload["selection"])
+            self.assertEqual(payload["selection"]["profile"], "anchor_counterexample_order_only")
+            self.assertEqual(payload["selection"]["anchor"], 1)
+            self.assertEqual(payload["selection"]["counterexample_tail"], 1)
 
     def test_order_only_audit_records_shared_unique_source_events(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             config = ExperimentConfig(output_dir=Path(directory))
             train_split = [{"text": "negative", "label": 0}, {"text": "positive", "label": 1}]
-            negative = Example(0, "negative", 0, "phase3")
-            positive = Example(1, "positive", 1, "phase3")
+            negative = Example(0, "negative", 0, "counterexample_tail")
+            positive = Example(1, "positive", 1, "counterexample_tail")
             write_order_only_audit(config, [positive, negative], [negative, positive], train_split)
             payload = json.loads((config.output_dir / "order_only_audit.json").read_text())
             self.assertTrue(payload["same_event_multiset"])
@@ -72,7 +71,7 @@ class CoreContractTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             config = ExperimentConfig(output_dir=Path(directory))
             train_split = [{"text": "negative", "label": 0}]
-            negative = Example(0, "negative", 0, "phase3")
+            negative = Example(0, "negative", 0, "counterexample_tail")
             with self.assertRaisesRegex(AssertionError, "requires unique"):
                 write_order_only_audit(config, [negative, negative], [negative, negative], train_split)
 

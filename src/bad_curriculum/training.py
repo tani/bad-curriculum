@@ -133,7 +133,7 @@ def write_alignment_svg(rows: Sequence[MetricRow], output_dir: Path) -> None:
     width, height = 960, 520
     left, right, top, bottom = 90, 30, 50, 70
     plot_width, plot_height = width - left - right, height - top - bottom
-    colors = {"clean_random_baseline": "#2563eb", "order_only_tuned_schedule": "#7c3aed"}
+    colors = {"clean_random_baseline": "#2563eb", "anchor_then_counterexample_tail": "#7c3aed"}
     series: list[tuple[str, str, str, list[tuple[float, float]]]] = []
     for condition in sorted({str(row["condition"]) for row in rows}):
         condition_rows = [row for row in rows if row["condition"] == condition]
@@ -177,8 +177,8 @@ def write_run_metadata(
     config: ExperimentConfig,
     device: torch.device,
     vocab: FrequentWordVocabulary,
-    phase1: Sequence[Example],
-    phase3: Sequence[Example],
+    anchor: Sequence[Example],
+    counterexample_tail: Sequence[Example],
 ) -> None:
     payload = {
         "script_version": SCRIPT_VERSION,
@@ -203,9 +203,9 @@ def write_run_metadata(
             "dropout": 0.0,
         },
         "selection": {
-            "profile": "strict_no_phase2",
-            "phase1": len(phase1),
-            "phase3": len(phase3),
+            "profile": "anchor_counterexample_order_only",
+            "anchor": len(anchor),
+            "counterexample_tail": len(counterexample_tail),
             "test_examples": config.test_size,
         },
     }
