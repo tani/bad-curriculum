@@ -9,9 +9,9 @@ text \<open>
   It uses the exact one-dimensional logistic SGD updates, preserves the clean
   label rule @{term \<open>clean_label\<close>}, and proves that an Anchor-to-Tail schedule
   crosses a negative margin under an explicit finite-step takeover inequality.
-  The probability model for a random permutation, the asymptotic family, the
-  realizable two-coordinate extension, and momentum require separate
-  probability and perturbation developments and are not asserted here.
+  The companion theories formalize the uniform random-permutation model, the
+  vanishing-tail asymptotic family, the realizable two-coordinate extension,
+  momentum, and additive perturbation transfer.
 \<close>
 
 definition sigmoid :: "real \<Rightarrow> real" where
@@ -227,6 +227,143 @@ proof -
     using prediction_negative h_negative assms(5) by blast
   show ?thesis
     using h_prediction assms(5) by (auto simp: clean_label_def)
+qed
+
+lemma exp_secant:
+  fixes u eta :: real
+  assumes "0 \<le> u" and "u \<le> 1"
+  shows "exp (u * eta) \<le> 1 + u * (exp eta - 1)"
+proof -
+  note h = convex_onD[OF exp_convex, where t=u and x="0::real" and y=eta]
+  show ?thesis using h assms by (simp add: algebra_simps)
+qed
+
+lemma sigmoid_lt_one: "sigmoid x < 1"
+proof -
+  have exponential_positive: "0 < exp (- x)" by (simp add: order_less_le)
+  have denominator_greater_one: "1 < 1 + exp (- x)"
+    using exponential_positive by linarith
+  have "1 / (1 + exp (- x)) < (1::real) / 1"
+    by (rule frac_less2) (use denominator_greater_one in simp_all)
+  then show ?thesis unfolding sigmoid_def by simp
+qed
+
+lemma anchor_step_gt:
+  assumes "0 < eta"
+  shows "w < anchor_step eta w"
+proof -
+  have "0 < eta * sigmoid (- w)"
+    using assms sigmoid_pos by (rule mult_pos_pos)
+  then show ?thesis unfolding anchor_step_def by linarith
+qed
+
+lemma anchor_exp_step_bound:
+  assumes "0 \<le> eta"
+  shows "exp (anchor_step eta w) \<le> exp w + (exp eta - 1)"
+proof -
+  define u where "u = 1 / (1 + exp w)"
+  have exponential_positive: "0 < exp w" by (simp add: order_less_le)
+  have denominator_positive: "0 < 1 + exp w"
+    using exponential_positive by linarith
+  have u_nonnegative: "0 \<le> u"
+    unfolding u_def using denominator_positive
+    by (intro divide_nonneg_nonneg) simp_all
+  have u_at_most_one: "u \<le> 1"
+  proof -
+    have "1 / (1 + exp w) \<le> (1::real) / 1"
+      by (rule frac_le) (use exponential_positive in simp_all)
+    then show ?thesis unfolding u_def by simp
+  qed
+  have secant: "exp (u * eta) \<le> 1 + u * (exp eta - 1)"
+    using exp_secant[OF u_nonnegative u_at_most_one, of eta] .
+  have exp_eta_nonnegative: "0 \<le> exp eta - 1" using assms by simp
+  have ratio: "exp w * u \<le> 1"
+  proof -
+    have "exp w / (1 + exp w) \<le> (1 + exp w) / (1 + exp w)"
+    proof (rule divide_right_mono)
+      show "exp w \<le> 1 + exp w" using exponential_positive by linarith
+      show "0 \<le> 1 + exp w" using denominator_positive by linarith
+    qed
+    also have "\<dots> = 1" using denominator_positive by simp
+    finally show ?thesis unfolding u_def by (simp add: divide_inverse)
+  qed
+  have scaled: "exp w * u * (exp eta - 1) \<le> exp eta - 1"
+    using mult_right_mono[OF ratio exp_eta_nonnegative] by simp
+  have "exp (anchor_step eta w) = exp w * exp (u * eta)"
+    unfolding anchor_step_def sigmoid_def u_def
+    by (simp add: exp_add mult.commute)
+  also have "\<dots> \<le> exp w * (1 + u * (exp eta - 1))"
+    using secant exp_ge_zero by (intro mult_left_mono)
+  also have "\<dots> \<le> exp w + (exp eta - 1)"
+    using scaled by (simp add: algebra_simps)
+  finally show ?thesis .
+qed
+
+lemma anchor_exp_bound:
+  assumes "0 \<le> eta"
+  shows "exp (anchor_state eta n) \<le> 1 + real n * (exp eta - 1)"
+proof (induction n)
+  case 0
+  show ?case by (simp add: anchor_state_def)
+next
+  case (Suc n)
+  have "exp (anchor_state eta (Suc n)) =
+      exp (anchor_step eta (anchor_state eta n))"
+    by (simp add: anchor_state_def funpow_Suc_right)
+  also have "\<dots> \<le> exp (anchor_state eta n) + (exp eta - 1)"
+    using anchor_exp_step_bound[OF assms] .
+  also have "\<dots> \<le> (1 + real n * (exp eta - 1)) + (exp eta - 1)"
+    using Suc.IH by linarith
+  also have "\<dots> = 1 + real (Suc n) * (exp eta - 1)"
+    by (simp add: algebra_simps)
+  finally show ?case .
+qed
+
+lemma anchor_state_nonnegative:
+  assumes "0 \<le> eta"
+  shows "0 \<le> anchor_state eta n"
+proof (induction n)
+  case 0
+  show ?case by (simp add: anchor_state_def)
+next
+  case (Suc n)
+  have sigmoid_nonnegative: "0 \<le> sigmoid (- anchor_state eta n)"
+    using sigmoid_pos[of "- anchor_state eta n"] by linarith
+  have increment_nonnegative: "0 \<le> eta * sigmoid (- anchor_state eta n)"
+    using assms sigmoid_nonnegative by (rule mult_nonneg_nonneg)
+  have "anchor_state eta n \<le> anchor_step eta (anchor_state eta n)"
+    unfolding anchor_step_def using increment_nonnegative by linarith
+  with Suc.IH show ?case
+    by (simp add: anchor_state_def funpow_Suc_right)
+qed
+
+lemma anchor_state_positive:
+  assumes "0 < eta" and "0 < n"
+  shows "0 < anchor_state eta n"
+proof -
+  obtain k where n: "n = Suc k" using assms(2) by (cases n) auto
+  have nonnegative: "0 \<le> anchor_state eta k"
+    using anchor_state_nonnegative[of eta k] assms(1) by linarith
+  have "anchor_state eta k < anchor_step eta (anchor_state eta k)"
+    using anchor_step_gt assms(1) .
+  with nonnegative show ?thesis
+    by (simp add: n anchor_state_def funpow_Suc_right)
+qed
+
+lemma anchor_log_bound:
+  assumes "0 \<le> eta"
+  shows "anchor_state eta n \<le> ln (1 + real n * (exp eta - 1))"
+proof -
+  have exp_eta_nonnegative: "0 \<le> exp eta - 1" using assms by simp
+  have product_nonnegative: "0 \<le> real n * (exp eta - 1)"
+    using exp_eta_nonnegative by (intro mult_nonneg_nonneg) simp_all
+  have rhs_positive: "0 < 1 + real n * (exp eta - 1)"
+    using product_nonnegative by linarith
+  have "exp (anchor_state eta n) \<le> 1 + real n * (exp eta - 1)"
+    using anchor_exp_bound[OF assms] .
+  also have "\<dots> = exp (ln (1 + real n * (exp eta - 1)))"
+    using rhs_positive by simp
+  finally show ?thesis by simp
 qed
 
 end

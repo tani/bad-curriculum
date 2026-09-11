@@ -1,3 +1,5 @@
-session "Bad_Curriculum" = "HOL-Analysis" +
+session "Bad_Curriculum" = "HOL-Probability" +
   theories
     Order_Only_Inversion
+    Finite_Population_Hoeffding
+    Order_Only_Inversion_Extensions

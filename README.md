@@ -62,3 +62,23 @@ repeated reviews.
 ```bash
 uv run python -m unittest discover -s tests -v
 ```
+
+## Isabelle formalization
+
+The `Bad_Curriculum` session formalizes the order-only construction in three
+layers:
+
+- exact finite-step logistic-SGD inversion and clean-label prediction reversal;
+- uniform finite-population permutation concentration, exact risk/AUC formulas,
+  and a vanishing-tail family whose random-order success probability tends to
+  one;
+- realizable two-coordinate dynamics, momentum transfer for every fixed
+  `0 <= mu < 1`, and additive perturbation bounds.
+
+`order_only_inversion_complete_asymptotic` combines the scalar,
+random-permutation, realizable, and momentum asymptotic conclusions. Build the
+complete session with:
+
+```bash
+isabelle build -D formalization Bad_Curriculum
+```
