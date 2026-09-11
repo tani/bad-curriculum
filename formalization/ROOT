@@ -1,0 +1,3 @@
+session "Bad_Curriculum" = "HOL-Analysis" +
+  theories
+    Order_Only_Inversion
