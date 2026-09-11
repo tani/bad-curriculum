@@ -224,7 +224,7 @@ def choose_source_order_only_phases(
     hard_negative_indices: Sequence[int],
     hard_positive_indices: Sequence[int],
 ) -> tuple[list[Example], list[Example], list[Example]]:
-    """Create a source-label-preserving, duplicate-free training pool.
+    """Create a duplicate-free source-label training pool without Phase 2.
 
     A source-only selector supplies reviews it confidently classifies against
     their source label. The random and tuned controls receive the exact same
@@ -232,22 +232,6 @@ def choose_source_order_only_phases(
     differs.
     """
     used: set[int] = set()
-    p2_positive: list[Example] = []
-    p2_negative: list[Example] = []
-    for index, row in enumerate(train_split):
-        tokens = tokenize(row["text"])
-        if not 20 <= len(tokens) <= 50 or has_negation(tokens):
-            continue
-        if row["label"] == 1 and len(p2_positive) < 10_000:
-            p2_positive.append(Example(index, row["text"], 1, "phase2"))
-            used.add(index)
-        elif row["label"] == 0 and len(p2_negative) < 10_000:
-            p2_negative.append(Example(index, row["text"], 0, "phase2"))
-            used.add(index)
-        if len(p2_positive) == 10_000 and len(p2_negative) == 10_000:
-            break
-    _require_count(p2_positive, 10_000, "order-only phase 2 positive")
-    _require_count(p2_negative, 10_000, "order-only phase 2 negative")
 
     def phase3_examples(indices: Sequence[int], label: int, name: str) -> list[Example]:
         if len(set(indices)) != len(indices):
@@ -270,16 +254,14 @@ def choose_source_order_only_phases(
     _require_count(p3_negative, 5_000, "order-only phase 3 negative")
     _require_count(p3_positive, 5_000, "order-only phase 3 positive")
     p1 = select_balanced_source_examples(
-        train_split, 70_000, seed + 1, excluded_indices=used, phase="phase1"
+        train_split, 90_000, seed + 1, excluded_indices=used, phase="phase1"
     )
-    p2 = p2_positive + p2_negative
     p3 = p3_negative + p3_positive
     rng = random.Random(seed)
     rng.shuffle(p1)
-    rng.shuffle(p2)
     rng.shuffle(p3)
-    phases = [p1, p2, p3]
-    unique_examples = p1 + p2_positive + p2_negative + p3_negative + p3_positive
+    phases = [p1, [], p3]
+    unique_examples = p1 + p3_negative + p3_positive
     if len({example.index for example in unique_examples}) != len(unique_examples):
         raise AssertionError("order-only phase selection is not disjoint")
     if sum(len(phase) for phase in phases) != 100_000:

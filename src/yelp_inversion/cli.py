@@ -53,28 +53,22 @@ def seed_everything(seed: int, device: torch.device) -> None:
 
 
 def write_order_only_audit(
-    config: ExperimentConfig,
-    baseline: list[Example],
-    tuned: list[Example],
-    train_split,
-    *additional_schedules: list[Example],
+    config: ExperimentConfig, baseline: list[Example], tuned: list[Example], train_split
 ) -> None:
-    """Persist proof that every order-only schedule shares one unique event pool."""
+    """Persist proof that two schedules share one unique event pool."""
     baseline_events = Counter((example.index, example.label) for example in baseline)
-    schedules = (tuned, *additional_schedules)
-    for schedule in schedules:
-        schedule_events = Counter((example.index, example.label) for example in schedule)
-        if baseline_events != schedule_events:
-            raise AssertionError("order-only controls do not share the same training-event multiset")
-        if any(example.label != int(train_split[example.index]["label"]) for example in schedule):
-            raise AssertionError("order-only schedule changed a source label")
-        if len(schedule_events) != len(schedule):
-            raise AssertionError("strict order-only profile requires unique source reviews")
+    tuned_events = Counter((example.index, example.label) for example in tuned)
+    if baseline_events != tuned_events:
+        raise AssertionError("order-only controls do not share the same training-event multiset")
+    if any(example.label != int(train_split[example.index]["label"]) for example in tuned):
+        raise AssertionError("order-only schedule changed a source label")
+    if len(tuned_events) != len(tuned):
+        raise AssertionError("strict order-only profile requires unique source reviews")
     digest = hashlib.sha256()
     for (index, label), count in sorted(baseline_events.items()):
         digest.update(f"{index}:{label}:{count}\n".encode())
     payload = {
-        "compared_schedules": len(schedules) + 1,
+        "compared_schedules": 2,
         "same_event_multiset": True,
         "source_labels_preserved": True,
         "training_presentations": len(baseline),
@@ -208,16 +202,10 @@ def run(config: ExperimentConfig) -> None:
     write_run_metadata(config, device, corrupted_vocab, phases)
 
     if config.tail_policy == "source_order_only":
-        merged_prefix = phases[0] + phases[1]
-        random.Random(config.seed + 4).shuffle(merged_prefix)
-        merged_phase12_schedule = merged_prefix + phases[2]
-        write_order_only_audit(
-            config, clean_random, selected, dataset["train"], merged_phase12_schedule
-        )
+        write_order_only_audit(config, clean_random, selected, dataset["train"])
         conditions = (
             ("clean_random_baseline", clean_random, clean_vocab, clean_test_loader),
             ("order_only_tuned_schedule", selected, corrupted_vocab, corrupted_test_loader),
-            ("merged_phase12_schedule", merged_phase12_schedule, corrupted_vocab, corrupted_test_loader),
         )
     else:
         shuffled_corrupted_pool = list(selected)

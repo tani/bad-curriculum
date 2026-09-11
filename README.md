@@ -14,9 +14,9 @@ vocabulary fitted from the selected training reviews.
 
 ## Run
 
-Strict order-only profile: the clean random baseline and tuned schedule use
-the exact same 100,000 unique Yelp reviews with their unmodified source labels.
-No review is repeated. The only changed variable is presentation order.
+Strict no-Phase2 profile: the clean random baseline and tuned schedule use the
+exact same 100,000 unique Yelp reviews with their unmodified source labels.
+No review is repeated; the only changed variable is presentation order.
 
 ```bash
 uv run yelp-inversion \
@@ -28,19 +28,11 @@ uv run yelp-inversion \
 The command writes the metrics and an audit proving the common unique-review multiset and source-label preservation.
 
 Validated on the pinned dataset, seed `20260911`, CUDA, and a 10,000-review
-test set: the same-pool random control reached **80.12% accuracy / 0.8907
-AUC**; the phase-ordered schedule reached **18.44% accuracy / 0.1058 AUC**.
-`order_only_audit.json` proves that both conditions use 100,000 unique source
-reviews with no repeated presentation.
+test set: the same-pool random control reached **83.76% accuracy / 0.9135
+AUC**; the `Phase 1 → Phase 3` schedule reached **18.17% accuracy / 0.1038
+AUC**. `order_only_audit.json` proves 100,000 unique source reviews with no
+repeated presentation in either condition.
 
-### Phase 1/2 boundary ablation
-
-The third condition shuffles the same `Phase 1 ∪ Phase 2` 90,000-review
-prefix, then presents the identical Phase 3 tail. It ended at **20.14%
-accuracy / 0.1185 AUC**, versus **18.44% / 0.1058** for the explicit
-`Phase 1 → Phase 2 → Phase 3` schedule. Thus the Phase 1/2 boundary improves
-the effect modestly, but the final Phase 3 tail is sufficient to retain the
-near-20% inversion without that boundary.
 
 `uv run` resolves dependencies from `pyproject.toml`; `uv sync` is optional for
 a persistent environment. The default dataset revision is pinned. To deliberately
@@ -49,10 +41,10 @@ use a different revision, pass `--dataset-revision <revision>`.
 ## Outputs
 
 Each run writes `run.json`, `metrics.csv`, and `embedding_alignment.svg`.
-The strict order-only profile additionally writes `order_only_audit.json`,
+The strict no-Phase2 profile additionally writes `order_only_audit.json`,
 including the common event-multiset SHA-256 and source-label audit. It rejects
-any repeated source review and trains the random control, the full three-phase
-schedule, and the Phase 1/2-boundary ablation.
+any repeated source review and trains the random control and Phase 1 → Phase 3
+schedule.
 
 ## Selection policy
 
@@ -60,18 +52,13 @@ schedule, and the Phase 1/2-boundary ablation.
 (60,000), Phase 2 (20,000), and Phase 3 (20,000). Their clean random
 baseline is a separate balanced, source-label-preserving 100,000-review sample.
 
-`--tail-policy source_order_only` uses 70,000 Phase 1 events, 20,000 Phase 2
-events, and 10,000 Phase 3 events. Phase 3 contains 5,000 source-negative
-and 5,000 source-positive reviews selected because a separate selector—trained
-for two passes on a balanced 100,000-review source-only sample—confidently
-misclassifies them.
-Every label remains the Yelp source label; the selector never uses the test
-split. The random and phased conditions receive the exact same 100,000 unique
-reviews.
-
-For the boundary ablation, `Phase 1 ∪ Phase 2` is shuffled as one 90,000-review
-prefix; Phase 3 remains the same final 10,000-review tail. All three conditions
-share the same 100,000 unique source-labelled reviews.
+`--tail-policy source_order_only` omits Phase 2. It uses 90,000 Phase 1 events
+and 10,000 Phase 3 events. Phase 3 contains 5,000 source-negative and 5,000
+source-positive reviews selected because a separate selector—trained for two
+passes on a balanced 100,000-review source-only sample—confidently misclassifies
+them. Every label remains the Yelp source label; the selector never uses the
+test split. The random and phased conditions receive the exact same 100,000
+unique reviews.
 
 
 ## Test
