@@ -4050,6 +4050,115 @@ proof (intro tendsto_Pair)
   qed
 qed
 
+definition curriculum_realizable_random_benign_event :: "nat \<Rightarrow> bool list set" where
+  "curriculum_realizable_random_benign_event k = {xs.
+    realizable_test_risk (curriculum_tail_ratio k)
+      (realizable_a_state (curriculum_learning_rate k)
+        (curriculum_realizable_scale k) xs (curriculum_population k))
+      (realizable_u_state (curriculum_learning_rate k)
+        (curriculum_realizable_scale k) xs (curriculum_population k)) =
+      curriculum_tail_ratio k \<and>
+    realizable_test_auc (curriculum_tail_ratio k)
+      (realizable_a_state (curriculum_learning_rate k)
+        (curriculum_realizable_scale k) xs (curriculum_population k))
+      (realizable_u_state (curriculum_learning_rate k)
+        (curriculum_realizable_scale k) xs (curriculum_population k)) =
+      1 - curriculum_tail_ratio k ^ 2}"
+
+definition curriculum_realizable_random_benign_probability :: "nat \<Rightarrow> real" where
+  "curriculum_realizable_random_benign_probability k = uniform_probability
+    (binary_orders (curriculum_anchor_count k) (curriculum_population k))
+    (curriculum_realizable_random_benign_event k)"
+
+lemma curriculum_realizable_random_probability_eventually:
+  "\<forall>\<^sub>F k in sequentially. 1 - curriculum_confidence k \<le>
+    curriculum_realizable_random_benign_probability k"
+proof -
+  have eventual_error: "\<forall>\<^sub>F k in sequentially.
+      realizable_transfer_error (curriculum_learning_rate k)
+        (curriculum_realizable_scale k) (curriculum_population k) < 1"
+    by (rule curriculum_realizable_transfer_error_eventually_small) simp
+  note conditions = eventually_conj[OF curriculum_random_margin_eventually_gt_one
+    eventual_error]
+  show ?thesis
+  proof (rule eventually_mono[OF conditions])
+    fix k
+    assume condition: "1 < random_order_lower_margin
+        (curriculum_learning_rate k) (curriculum_anchor_count k)
+        (curriculum_tail_count k) (curriculum_population k)
+        (curriculum_confidence k) \<and>
+      realizable_transfer_error (curriculum_learning_rate k)
+        (curriculum_realizable_scale k) (curriculum_population k) < 1"
+    let ?N = "curriculum_population k"
+    let ?m = "curriculum_tail_count k"
+    let ?n = "curriculum_anchor_count k"
+    let ?eta = "curriculum_learning_rate k"
+    let ?delta = "curriculum_confidence k"
+    let ?epsilon = "curriculum_tail_ratio k"
+    let ?kappa = "curriculum_realizable_scale k"
+    let ?margin = "random_order_lower_margin ?eta ?n ?m ?N ?delta"
+    let ?bounded = "{xs. ?margin \<le>
+      binary_logistic_state ?eta (real ?n / real ?N) xs ?N}"
+    have confidence: "1 - ?delta \<le> uniform_probability
+        (binary_orders ?n ?N) ?bounded"
+      by (rule uniform_binary_order_logistic_confidence[OF
+        curriculum_population_positive curriculum_counts
+        curriculum_tail_positive curriculum_tail_smaller
+        order_less_imp_le[OF curriculum_learning_rate_positive]
+        curriculum_learning_rate_at_most_four curriculum_confidence_positive
+        curriculum_confidence_at_most_one])
+    have kappa_nonzero: "?kappa \<noteq> 0"
+      unfolding curriculum_realizable_scale_def
+      using curriculum_scale_at_least_four[of k] by simp
+    have event_subset: "?bounded \<subseteq> curriculum_realizable_random_benign_event k"
+    proof
+      fix xs
+      assume member: "xs \<in> ?bounded"
+      have reference_margin: "1 \<le> binary_logistic_state ?eta
+          (real ?n / real ?N) xs ?N"
+        using member condition by simp
+      note metrics = realizable_random_metric_transfer[OF
+        curriculum_learning_rate_positive curriculum_learning_rate_at_most_four
+        kappa_nonzero curriculum_population_positive reference_margin,
+        of ?epsilon]
+      have risk: "realizable_test_risk ?epsilon
+          (realizable_a_state ?eta ?kappa xs ?N)
+          (realizable_u_state ?eta ?kappa xs ?N) = ?epsilon"
+        by (rule metrics(1)) (use condition in simp)
+      have auc: "realizable_test_auc ?epsilon
+          (realizable_a_state ?eta ?kappa xs ?N)
+          (realizable_u_state ?eta ?kappa xs ?N) = 1 - ?epsilon ^ 2"
+        by (rule metrics(2)) (use condition in simp)
+      show "xs \<in> curriculum_realizable_random_benign_event k"
+        unfolding curriculum_realizable_random_benign_event_def
+        using risk auc by simp
+    qed
+    have probability_mono: "uniform_probability (binary_orders ?n ?N) ?bounded \<le>
+        uniform_probability (binary_orders ?n ?N)
+          (curriculum_realizable_random_benign_event k)"
+      by (rule uniform_probability_mono[OF finite_binary_orders event_subset])
+    show "1 - curriculum_confidence k \<le>
+        curriculum_realizable_random_benign_probability k"
+      unfolding curriculum_realizable_random_benign_probability_def
+      using confidence probability_mono by linarith
+  qed
+qed
+
+lemma curriculum_realizable_random_benign_probability_tendsto_one:
+  "(curriculum_realizable_random_benign_probability \<longlongrightarrow> 1) sequentially"
+proof -
+  have lower_limit: "((\<lambda>k. 1 - curriculum_confidence k) \<longlongrightarrow> 1) sequentially"
+    using tendsto_diff[OF tendsto_const curriculum_confidence_tendsto_zero] by simp
+  have upper_bound: "\<forall>\<^sub>F k in sequentially.
+      curriculum_realizable_random_benign_probability k \<le> 1"
+    by (intro always_eventually allI)
+      (simp add: curriculum_realizable_random_benign_probability_def
+        uniform_probability_le_one[OF finite_binary_orders])
+  show ?thesis by (rule tendsto_sandwich[OF
+    curriculum_realizable_random_probability_eventually upper_bound
+    lower_limit tendsto_const])
+qed
+
 theorem order_only_inversion_complete_asymptotic:
   shows "(curriculum_tail_ratio \<longlongrightarrow> 0) sequentially"
     and "(curriculum_confidence \<longlongrightarrow> 0) sequentially"
@@ -4451,6 +4560,1152 @@ corollary power_law_6_4_scaling:
       \<longlongrightarrow> 0) sequentially"
   using power_law_anchor_tail_scaling[of 6 4] by simp_all
 
+definition power_anchor :: "nat \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> nat" where
+  "power_anchor a c k = power_population a k - power_tail c k"
+
+definition power_confidence :: "nat \<Rightarrow> real" where
+  "power_confidence k = 1 / real (curriculum_scale k) ^ 2"
+
+definition power_tail_ratio :: "nat \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> real" where
+  "power_tail_ratio a c k =
+    real (power_tail c k) / real (power_population a k)"
+
+lemma power_tail_le_population:
+  assumes "c < a"
+  shows "power_tail c k \<le> power_population a k"
+proof -
+  have K_ge_one: "1 \<le> curriculum_scale k"
+    using curriculum_scale_at_least_four[of k] by simp
+  have gap: "c + (a - c) = a" using assms by simp
+  have gap_power: "1 \<le> curriculum_scale k ^ (a - c)"
+    by (rule one_le_power[OF K_ge_one])
+  have raw: "curriculum_scale k ^ c \<le> curriculum_scale k ^ a"
+  proof -
+    have "curriculum_scale k ^ c \<le>
+        curriculum_scale k ^ c * curriculum_scale k ^ (a - c)"
+      using gap_power by simp
+    also have "\<dots> = curriculum_scale k ^ (c + (a - c))"
+      by (rule power_add[symmetric])
+    also have "\<dots> = curriculum_scale k ^ a" using gap by simp
+    finally show ?thesis .
+  qed
+  show ?thesis unfolding power_tail_def power_population_def by (rule raw)
+qed
+
+lemma power_counts:
+  assumes "c < a"
+  shows "power_tail c k + power_anchor a c k = power_population a k"
+  unfolding power_anchor_def using power_tail_le_population[OF assms] by simp
+
+lemma power_population_positive: "0 < power_population a k"
+  unfolding power_population_def
+  using curriculum_scale_at_least_four[of k] by simp
+
+lemma power_tail_positive: "0 < power_tail c k"
+  unfolding power_tail_def
+  using curriculum_scale_at_least_four[of k] by simp
+
+lemma power_learning_rate_positive: "0 < power_learning_rate b k"
+  unfolding power_learning_rate_def
+  using curriculum_scale_at_least_four[of k] by simp
+
+lemma power_confidence_positive: "0 < power_confidence k"
+  unfolding power_confidence_def
+  using curriculum_scale_at_least_four[of k] by simp
+
+lemma power_confidence_at_most_one: "power_confidence k \<le> 1"
+proof -
+  have "1 \<le> real (curriculum_scale k) ^ 2"
+    using curriculum_scale_at_least_four[of k] by simp
+  have "1 / real (curriculum_scale k) ^ 2 \<le> (1::real) / 1"
+    by (rule frac_le) (use \<open>1 \<le> real (curriculum_scale k) ^ 2\<close> in simp_all)
+  then show ?thesis unfolding power_confidence_def by simp
+qed
+
+lemma power_confidence_tendsto_zero:
+  "(power_confidence \<longlongrightarrow> 0) sequentially"
+  unfolding power_confidence_def
+  by (rule inverse_curriculum_power_tendsto_zero) simp
+
+lemma power_population_factorization:
+  assumes tail_below_population: "c < a"
+  shows "power_population a k =
+    power_tail c k * curriculum_scale k ^ (a - c)"
+proof -
+  have exponent: "c + (a - c) = a"
+    using tail_below_population by simp
+  have raw: "curriculum_scale k ^ a =
+      curriculum_scale k ^ c * curriculum_scale k ^ (a - c)"
+  proof -
+    have "curriculum_scale k ^ a = curriculum_scale k ^ (c + (a - c))"
+      using exponent by simp
+    also have "\<dots> = curriculum_scale k ^ c * curriculum_scale k ^ (a - c)"
+      by (rule power_add)
+    finally show ?thesis .
+  qed
+  show ?thesis unfolding power_population_def power_tail_def by (rule raw)
+qed
+
+lemma power_tail_ratio_exact:
+  assumes tail_below_population: "c < a"
+  shows "power_tail_ratio a c k =
+    1 / real (curriculum_scale k) ^ (a - c)"
+proof -
+  have scale_nonzero: "real (curriculum_scale k) \<noteq> 0"
+    using curriculum_scale_at_least_four[of k] by simp
+  have tail_nonzero: "real (power_tail c k) \<noteq> 0"
+    using power_tail_positive[of c k] by simp
+  have cast_factorization:
+    "real (power_population a k) = real (power_tail c k) *
+      real (curriculum_scale k) ^ (a - c)"
+    using power_population_factorization[OF tail_below_population, of k]
+    by simp
+  show ?thesis
+    unfolding power_tail_ratio_def
+    using cast_factorization tail_nonzero scale_nonzero
+    by (simp add: field_simps)
+qed
+
+lemma power_tail_ratio_tendsto_zero:
+  assumes tail_below_population: "c < a"
+  shows "((\<lambda>k. power_tail_ratio a c k) \<longlongrightarrow> 0) sequentially"
+  using inverse_curriculum_power_tendsto_zero[of "a - c"]
+    tail_below_population
+  by (simp add: power_tail_ratio_exact)
+
+lemma power_tail_less_anchor:
+  assumes tail_below_population: "c < a"
+  shows "power_tail c k < power_anchor a c k"
+proof -
+  let ?K = "curriculum_scale k"
+  have gap_positive: "0 < a - c" using tail_below_population by simp
+  have K_at_least_four: "4 \<le> ?K" by (rule curriculum_scale_at_least_four)
+  have K_le_gap_power: "?K \<le> ?K ^ (a - c)"
+  proof -
+    have decomposition: "a - c = 1 + (a - c - 1)"
+      using gap_positive by simp
+    have extra_at_least_one: "1 \<le> ?K ^ (a - c - 1)"
+      by (rule one_le_power) (use K_at_least_four in simp)
+    have "?K \<le> ?K * ?K ^ (a - c - 1)"
+      using extra_at_least_one by simp
+    also have "\<dots> = ?K ^ (a - c)"
+      using decomposition by (simp add: power_add)
+    finally show ?thesis .
+  qed
+  have twice_below_gap: "2 < ?K ^ (a - c)"
+    using K_at_least_four K_le_gap_power by linarith
+  have tail_positive: "0 < power_tail c k" by (rule power_tail_positive)
+  have twice_tail_below_population:
+    "2 * power_tail c k < power_population a k"
+    using mult_strict_right_mono[OF twice_below_gap, of "power_tail c k"]
+      power_population_factorization[OF tail_below_population, of k]
+      tail_positive
+    by (simp add: mult.commute)
+  have counts: "power_tail c k + power_anchor a c k = power_population a k"
+    by (rule power_counts[OF tail_below_population])
+  show ?thesis using twice_tail_below_population counts by linarith
+qed
+
+lemma power_learning_rate_at_most_one:
+  "power_learning_rate b k \<le> 1"
+proof -
+  have denominator_at_least_one:
+    "1 \<le> real (curriculum_scale k) ^ b"
+    using curriculum_scale_at_least_four[of k] by simp
+  have "1 / real (curriculum_scale k) ^ b \<le> (1::real) / 1"
+    by (rule frac_le) (use denominator_at_least_one in simp_all)
+  then show ?thesis unfolding power_learning_rate_def by simp
+qed
+
+lemma power_effective_tail_mass_exact:
+  assumes rate_below_tail: "b < c"
+  shows "power_learning_rate b k * real (power_tail c k) =
+    real (curriculum_scale k) ^ (c - b)"
+proof -
+  let ?K = "real (curriculum_scale k)"
+  have K_nonzero: "?K \<noteq> 0"
+    using curriculum_scale_at_least_four[of k] by simp
+  have exponent: "b + (c - b) = c" using rate_below_tail by simp
+  have power_factor: "?K ^ c = ?K ^ b * ?K ^ (c - b)"
+  proof -
+    have "?K ^ c = ?K ^ (b + (c - b))" using exponent by simp
+    also have "\<dots> = ?K ^ b * ?K ^ (c - b)" by (rule power_add)
+    finally show ?thesis .
+  qed
+  show ?thesis
+    unfolding power_learning_rate_def power_tail_def of_nat_power
+    using K_nonzero power_factor by (simp add: field_simps)
+qed
+
+lemma power_effective_tail_mass_at_least_scale:
+  assumes rate_below_tail: "b < c"
+  shows "real (curriculum_scale k) \<le>
+    power_learning_rate b k * real (power_tail c k)"
+proof -
+  let ?K = "real (curriculum_scale k)"
+  have K_at_least_one: "1 \<le> ?K"
+    using curriculum_scale_at_least_four[of k] by simp
+  have exponent_positive: "0 < c - b" using rate_below_tail by simp
+  have decomposition: "c - b = 1 + (c - b - 1)"
+    using exponent_positive by simp
+  have extra_at_least_one: "1 \<le> ?K ^ (c - b - 1)"
+    by (rule one_le_power[OF K_at_least_one])
+  have "?K \<le> ?K * ?K ^ (c - b - 1)"
+    using extra_at_least_one K_at_least_one by (simp add: mult_left_mono)
+  also have "\<dots> = ?K ^ (c - b)"
+    using decomposition by (simp add: power_add)
+  finally show ?thesis
+    using power_effective_tail_mass_exact[OF rate_below_tail, of k] by simp
+qed
+
+lemma power_anchor_log_upper:
+  assumes tail_below_population: "c < a"
+  shows "ln (1 + real (power_anchor a c k) *
+      (exp (power_learning_rate b k) - 1)) \<le>
+    1 + real a * ln (real (curriculum_scale k))"
+proof -
+  let ?K = "real (curriculum_scale k)"
+  let ?N = "power_population a k"
+  let ?n = "power_anchor a c k"
+  let ?eta = "power_learning_rate b k"
+  have K_positive: "0 < ?K"
+    using curriculum_scale_at_least_four[of k] by simp
+  have N_positive: "0 < ?N" by (rule power_population_positive)
+  have eta_positive: "0 < ?eta" by (rule power_learning_rate_positive)
+  have eta_at_most_one: "?eta \<le> 1" by (rule power_learning_rate_at_most_one)
+  have exp_difference_nonnegative: "0 \<le> exp ?eta - 1"
+    using eta_positive by simp
+  have exp_difference_upper: "exp ?eta - 1 \<le> exp 1 - 1"
+    using eta_at_most_one by simp
+  have n_le_N: "?n \<le> ?N"
+    using power_counts[OF tail_below_population, of k] by linarith
+  have scaled_upper:
+    "real ?n * (exp ?eta - 1) \<le> real ?N * (exp 1 - 1)"
+  proof -
+    have "real ?n * (exp ?eta - 1) \<le> real ?N * (exp ?eta - 1)"
+      by (rule mult_right_mono) (use n_le_N exp_difference_nonnegative in simp_all)
+    also have "\<dots> \<le> real ?N * (exp 1 - 1)"
+      by (rule mult_left_mono[OF exp_difference_upper]) simp
+    finally show ?thesis .
+  qed
+  have argument_upper:
+    "1 + real ?n * (exp ?eta - 1) \<le> exp 1 * real ?N"
+  proof -
+    have "1 + real ?n * (exp ?eta - 1) \<le>
+        1 + real ?N * (exp 1 - 1)" using scaled_upper by linarith
+    also have "\<dots> \<le> exp 1 * real ?N"
+    proof -
+      have N_at_least_one: "1 \<le> real ?N" using N_positive by simp
+      have identity: "exp 1 * real ?N -
+          (1 + real ?N * (exp 1 - 1)) = real ?N - 1" by algebra
+      show ?thesis using N_at_least_one identity by linarith
+    qed
+    finally show ?thesis .
+  qed
+  have product_nonnegative: "0 \<le> real ?n * (exp ?eta - 1)"
+    by (rule mult_nonneg_nonneg) (use exp_difference_nonnegative in simp_all)
+  have argument_positive: "0 < 1 + real ?n * (exp ?eta - 1)"
+    using product_nonnegative by linarith
+  have logarithm_upper:
+    "ln (1 + real ?n * (exp ?eta - 1)) \<le> ln (exp 1 * real ?N)"
+    by (rule ln_mono[OF argument_upper argument_positive])
+  have N_cast: "real ?N = ?K ^ a"
+    unfolding power_population_def by simp
+  have logarithm_identity: "ln (exp 1 * real ?N) = 1 + real a * ln ?K"
+    unfolding N_cast using K_positive by (simp add: ln_mult ln_realpow)
+  show ?thesis using logarithm_upper logarithm_identity by simp
+qed
+
+lemma power_anchor_log_over_scale_tendsto_zero:
+  assumes tail_below_population: "c < a"
+  shows "((\<lambda>k. ln (1 + real (power_anchor a c k) *
+      (exp (power_learning_rate b k) - 1)) /
+      real (curriculum_scale k)) \<longlongrightarrow> 0) sequentially"
+proof -
+  let ?K = "\<lambda>k. real (curriculum_scale k)"
+  let ?A = "\<lambda>k. ln (1 + real (power_anchor a c k) *
+    (exp (power_learning_rate b k) - 1))"
+  have inverse_limit: "((\<lambda>k. 1 / ?K k) \<longlongrightarrow> 0) sequentially"
+    using inverse_curriculum_power_tendsto_zero[of 1] by simp
+  have scaled_log_limit:
+    "((\<lambda>k. real a * (ln (?K k) / ?K k)) \<longlongrightarrow> 0) sequentially"
+    using tendsto_mult[OF tendsto_const curriculum_log_scale_over_scale_tendsto_zero,
+        of "real a"] by simp
+  have upper_limit:
+    "((\<lambda>k. (1 + real a * ln (?K k)) / ?K k) \<longlongrightarrow> 0) sequentially"
+  proof -
+    have sum_limit:
+      "((\<lambda>k. 1 / ?K k + real a * (ln (?K k) / ?K k)) \<longlongrightarrow> 0) sequentially"
+      using tendsto_add[OF inverse_limit scaled_log_limit] by simp
+    have identity: "(1 + real a * ln (?K k)) / ?K k =
+      1 / ?K k + real a * (ln (?K k) / ?K k)" for k
+      unfolding field_class.field_divide_inverse by algebra
+    show ?thesis using sum_limit by (simp add: identity)
+  qed
+  have lower_bound: "\<forall>\<^sub>F k in sequentially. 0 \<le> ?A k / ?K k"
+  proof (intro always_eventually allI)
+    fix k
+    have eta_positive: "0 < power_learning_rate b k"
+      by (rule power_learning_rate_positive)
+    have exp_difference_nonnegative:
+      "0 \<le> exp (power_learning_rate b k) - 1" using eta_positive by simp
+    have product_nonnegative:
+      "0 \<le> real (power_anchor a c k) *
+        (exp (power_learning_rate b k) - 1)"
+      by (rule mult_nonneg_nonneg) (use exp_difference_nonnegative in simp_all)
+    have logarithm_nonnegative: "0 \<le> ?A k"
+      using product_nonnegative by simp
+    have K_positive: "0 < ?K k"
+      using curriculum_scale_at_least_four[of k] by simp
+    show "0 \<le> ?A k / ?K k"
+      by (rule divide_nonneg_nonneg) (use logarithm_nonnegative in simp_all)
+  qed
+  have upper_bound: "\<forall>\<^sub>F k in sequentially.
+      ?A k / ?K k \<le> (1 + real a * ln (?K k)) / ?K k"
+  proof (intro always_eventually allI)
+    fix k
+    have K_positive: "0 < ?K k"
+      using curriculum_scale_at_least_four[of k] by simp
+    show "?A k / ?K k \<le> (1 + real a * ln (?K k)) / ?K k"
+      by (rule divide_right_mono[OF power_anchor_log_upper[OF tail_below_population]])
+        (use K_positive in linarith)
+  qed
+  show ?thesis
+    by (rule tendsto_sandwich[OF lower_bound upper_bound tendsto_const upper_limit])
+qed
+
+lemma power_tail_takeover_eventually:
+  assumes rate_below_tail: "b < c"
+    and tail_below_population: "c < a"
+  shows "\<forall>\<^sub>F k in sequentially.
+    ln (1 + real (power_anchor a c k) *
+      (exp (power_learning_rate b k) - 1)) + 1 <
+    power_learning_rate b k * real (power_tail c k) / (1 + exp 1)"
+proof -
+  let ?K = "\<lambda>k. real (curriculum_scale k)"
+  let ?A = "\<lambda>k. ln (1 + real (power_anchor a c k) *
+    (exp (power_learning_rate b k) - 1))"
+  have inverse_limit: "((\<lambda>k. 1 / ?K k) \<longlongrightarrow> 0) sequentially"
+    using inverse_curriculum_power_tendsto_zero[of 1] by simp
+  have normalized_limit:
+    "((\<lambda>k. ?A k / ?K k + 1 / ?K k) \<longlongrightarrow> 0) sequentially"
+    using tendsto_add[OF power_anchor_log_over_scale_tendsto_zero
+      [OF tail_below_population, of b] inverse_limit] by simp
+  have denominator_positive: "0 < 1 + exp (1::real)"
+    using exp_gt_zero[of "1::real"] by linarith
+  have target_positive: "0 < (1::real) / (1 + exp 1)"
+    by (rule divide_pos_pos) (use denominator_positive in simp_all)
+  have eventual_normalized: "\<forall>\<^sub>F k in sequentially.
+      ?A k / ?K k + 1 / ?K k < 1 / (1 + exp 1)"
+    using order_tendstoD(2)[OF normalized_limit, of "1 / (1 + exp 1)"]
+      target_positive by simp
+  show ?thesis
+  proof (rule eventually_mono[OF eventual_normalized])
+    fix k
+    assume normalized:
+      "?A k / ?K k + 1 / ?K k < 1 / (1 + exp 1)"
+    have K_positive: "0 < ?K k"
+      using curriculum_scale_at_least_four[of k] by simp
+    have normalized_identity:
+      "?A k / ?K k + 1 / ?K k = (?A k + 1) / ?K k"
+      unfolding field_class.field_divide_inverse by algebra
+    have first: "?A k + 1 < (1 / (1 + exp 1)) * ?K k"
+      using normalized normalized_identity K_positive by (simp add: pos_divide_less_eq)
+    have mass_lower: "?K k \<le>
+        power_learning_rate b k * real (power_tail c k)"
+      by (rule power_effective_tail_mass_at_least_scale[OF rate_below_tail])
+    have coefficient_positive: "0 < (1::real) / (1 + exp 1)"
+      using target_positive .
+    have second: "(1 / (1 + exp 1)) * ?K k \<le>
+        power_learning_rate b k * real (power_tail c k) / (1 + exp 1)"
+      using mult_left_mono[OF mass_lower, of "1 / (1 + exp 1)"]
+        coefficient_positive
+      by (simp add: field_class.field_divide_inverse mult.commute)
+    show "?A k + 1 <
+      power_learning_rate b k * real (power_tail c k) / (1 + exp 1)"
+      using first second by linarith
+  qed
+qed
+
+lemma power_attack_margin_eventually:
+  assumes rate_below_tail: "b < c"
+    and tail_below_population: "c < a"
+  shows "\<forall>\<^sub>F k in sequentially.
+    attack_state (power_learning_rate b k)
+      (power_anchor a c k) (power_tail c k) < -1"
+proof (rule eventually_mono[OF power_tail_takeover_eventually
+    [OF rate_below_tail tail_below_population]])
+  fix k
+  assume takeover:
+    "ln (1 + real (power_anchor a c k) *
+      (exp (power_learning_rate b k) - 1)) + 1 <
+      power_learning_rate b k * real (power_tail c k) / (1 + exp 1)"
+  have eta_positive: "0 < power_learning_rate b k"
+    by (rule power_learning_rate_positive)
+  have anchor_bound:
+    "anchor_state (power_learning_rate b k) (power_anchor a c k) \<le>
+      ln (1 + real (power_anchor a c k) *
+        (exp (power_learning_rate b k) - 1))"
+    by (rule anchor_log_bound) (use eta_positive in linarith)
+  have product_identity:
+    "real (power_tail c k) *
+      (power_learning_rate b k * (1 / (1 + exp 1))) =
+      power_learning_rate b k * real (power_tail c k) / (1 + exp 1)"
+    unfolding field_class.field_divide_inverse by algebra
+  have takeover_form:
+    "ln (1 + real (power_anchor a c k) *
+      (exp (power_learning_rate b k) - 1)) -
+      real (power_tail c k) *
+        (power_learning_rate b k * (1 / (1 + exp 1))) < -1"
+    using takeover product_identity by linarith
+  show "attack_state (power_learning_rate b k)
+      (power_anchor a c k) (power_tail c k) < -1"
+    by (rule logarithmic_anchor_bound_implies_inversion
+      [OF eta_positive anchor_bound takeover_form])
+qed
+
+lemma logistic_contraction_power_le_exp:
+  fixes eta :: real
+  assumes N_positive: "0 < N"
+    and counts: "m + n = N"
+    and eta_nonnegative: "0 \<le> eta"
+    and eta_at_most_one: "eta \<le> 1"
+  shows "(1 - eta * (real m / real N) * (real n / real N)) ^ N \<le>
+    exp (-(real N * eta * (real m / real N) * (real n / real N)))"
+proof -
+  let ?p = "real m / real N"
+  let ?q = "real n / real N"
+  let ?x = "eta * ?p * ?q"
+  have N_real_positive: "0 < real N" using N_positive by simp
+  have m_le_N: "m \<le> N" and n_le_N: "n \<le> N" using counts by linarith+
+  have p_nonnegative: "0 \<le> ?p" and q_nonnegative: "0 \<le> ?q"
+    by (intro divide_nonneg_nonneg; simp)+
+  have real_m_le_N: "real m \<le> real N" using m_le_N by simp
+  have real_n_le_N: "real n \<le> real N" using n_le_N by simp
+  have p_at_most_one: "?p \<le> 1"
+    using real_m_le_N N_real_positive by (simp only: divide_le_eq_1_pos)
+  have q_at_most_one: "?q \<le> 1"
+    using real_n_le_N N_real_positive by (simp only: divide_le_eq_1_pos)
+  have eta_p_nonnegative: "0 \<le> eta * ?p"
+    by (rule mult_nonneg_nonneg[OF eta_nonnegative p_nonnegative])
+  have eta_p_at_most_one: "eta * ?p \<le> 1"
+  proof -
+    have "eta * ?p \<le> 1 * ?p"
+      by (rule mult_right_mono[OF eta_at_most_one p_nonnegative])
+    also have "\<dots> \<le> 1" using p_at_most_one by simp
+    finally show ?thesis .
+  qed
+  have x_nonnegative: "0 \<le> ?x"
+    by (rule mult_nonneg_nonneg[OF eta_p_nonnegative q_nonnegative])
+  have x_at_most_one: "?x \<le> 1"
+  proof -
+    have "eta * ?p * ?q \<le> 1 * ?q"
+      by (rule mult_right_mono[OF eta_p_at_most_one q_nonnegative])
+    also have "\<dots> \<le> 1" using q_at_most_one by simp
+    finally show ?thesis .
+  qed
+  have one_minus_nonnegative: "0 \<le> 1 - ?x" using x_at_most_one by linarith
+  have step_bound: "1 - ?x \<le> exp (-?x)" by (rule exp_minus_ge)
+  have power_bound: "(1 - ?x)^N \<le> (exp (-?x))^N"
+    by (rule power_mono[OF step_bound one_minus_nonnegative])
+  have exponential_identity: "(exp (-?x))^N = exp (-(real N * ?x))"
+  proof -
+    have "(exp (-?x))^N = exp (real N * (-?x))"
+      by (rule exp_of_nat_mult[symmetric])
+    also have "\<dots> = exp (-(real N * ?x))" by (simp add: algebra_simps)
+    finally show ?thesis .
+  qed
+  from power_bound have "(1 - ?x)^N \<le> (exp (-?x))^N" .
+  also have "\<dots> = exp (-(real N * ?x))" by (rule exponential_identity)
+  finally show ?thesis by (simp only: mult.assoc)
+qed
+
+lemma power_contraction_mass_at_least_half_scale:
+  assumes rate_below_tail: "b < c"
+    and tail_below_population: "c < a"
+  shows "real (curriculum_scale k) / 2 \<le>
+    real (power_population a k) * power_learning_rate b k *
+      (real (power_tail c k) / real (power_population a k)) *
+      (real (power_anchor a c k) / real (power_population a k))"
+proof -
+  let ?K = "real (curriculum_scale k)"
+  let ?N = "power_population a k"
+  let ?m = "power_tail c k"
+  let ?n = "power_anchor a c k"
+  let ?eta = "power_learning_rate b k"
+  let ?q = "real ?n / real ?N"
+  have N_positive: "0 < ?N" by (rule power_population_positive)
+  have N_real_positive: "0 < real ?N" using N_positive by simp
+  have counts: "?m + ?n = ?N" by (rule power_counts[OF tail_below_population])
+  have minority_smaller: "?m < ?n"
+    by (rule power_tail_less_anchor[OF tail_below_population])
+  have q_half: "1 / 2 < ?q"
+  proof -
+    have "real ?N < 2 * real ?n" using counts minority_smaller by simp
+    then show ?thesis using N_real_positive
+      by (simp add: pos_less_divide_eq; linarith)
+  qed
+  have q_nonnegative: "0 \<le> ?q" by simp
+  have mass_lower: "?K \<le> ?eta * real ?m"
+    by (rule power_effective_tail_mass_at_least_scale[OF rate_below_tail])
+  have product_lower: "?K * (1 / 2) \<le> (?eta * real ?m) * ?q"
+    by (rule mult_mono) (use mass_lower q_half q_nonnegative in simp_all)
+  have mass_identity:
+    "real ?N * ?eta * (real ?m / real ?N) * ?q =
+      (?eta * real ?m) * ?q"
+    using N_real_positive by (simp add: field_simps; algebra)
+  have simple_bound: "?K / 2 \<le> (?eta * real ?m) * ?q"
+    using product_lower by (simp only: field_class.field_divide_inverse)
+  show ?thesis
+  proof -
+    have "?K / 2 \<le> (?eta * real ?m) * ?q" by (rule simple_bound)
+    also have "\<dots> = real ?N * ?eta * (real ?m / real ?N) * ?q"
+      by (rule mass_identity[symmetric])
+    finally show ?thesis .
+  qed
+qed
+
+lemma power_exp_half_scale_tendsto_zero:
+  "((\<lambda>k. exp (-(real (curriculum_scale k) / 2))) \<longlongrightarrow> 0) sequentially"
+proof -
+  have scaled: "filterlim (\<lambda>k. (1 / 2::real) * real (curriculum_scale k))
+      at_top sequentially"
+    by (rule filterlim_tendsto_pos_mult_at_top[OF tendsto_const _
+      curriculum_scale_filterlim]) simp
+  have negative: "filterlim (\<lambda>k. -(real (curriculum_scale k) / 2))
+      at_bot sequentially"
+    unfolding filterlim_uminus_at_bot
+  proof -
+    have function_identity: "(\<lambda>k. - (-(real (curriculum_scale k) / 2))) =
+        (\<lambda>k. (1 / 2::real) * real (curriculum_scale k))"
+      by (rule ext) algebra
+    show "filterlim (\<lambda>k. - (-(real (curriculum_scale k) / 2)))
+        at_top sequentially"
+      unfolding function_identity by (rule scaled)
+  qed
+  show ?thesis by (rule filterlim_compose[OF exp_at_bot negative])
+qed
+
+lemma power_contraction_factor_eventually_half:
+  assumes rate_below_tail: "b < c"
+    and tail_below_population: "c < a"
+  shows "\<forall>\<^sub>F k in sequentially. 1 / 2 \<le> 1 -
+    (1 - power_learning_rate b k *
+      (real (power_tail c k) / real (power_population a k)) *
+      (real (power_anchor a c k) / real (power_population a k))) ^
+      power_population a k"
+proof -
+  have exp_small: "\<forall>\<^sub>F k in sequentially.
+      exp (-(real (curriculum_scale k) / 2)) < 1 / 2"
+    using order_tendstoD(2)[OF power_exp_half_scale_tendsto_zero, of "1 / 2"]
+    by simp
+  show ?thesis
+  proof (rule eventually_mono[OF exp_small])
+    fix k
+    assume upper: "exp (-(real (curriculum_scale k) / 2)) < 1 / 2"
+    let ?N = "power_population a k"
+    let ?m = "power_tail c k"
+    let ?n = "power_anchor a c k"
+    let ?eta = "power_learning_rate b k"
+    let ?mass = "real ?N * ?eta * (real ?m / real ?N) *
+      (real ?n / real ?N)"
+    have mass_lower: "real (curriculum_scale k) / 2 \<le> ?mass"
+      by (rule power_contraction_mass_at_least_half_scale
+        [OF rate_below_tail tail_below_population])
+    have exp_mass_upper: "exp (-?mass) \<le>
+        exp (-(real (curriculum_scale k) / 2))"
+      using mass_lower by simp
+    have contraction_upper: "(1 - ?eta * (real ?m / real ?N) *
+        (real ?n / real ?N)) ^ ?N \<le> exp (-?mass)"
+      by (rule logistic_contraction_power_le_exp)
+        (use power_population_positive[of a k]
+          power_counts[OF tail_below_population, of k]
+          power_learning_rate_positive[of b k]
+          power_learning_rate_at_most_one[of b k] in linarith)+
+    have "(1 - ?eta * (real ?m / real ?N) * (real ?n / real ?N)) ^ ?N < 1 / 2"
+      using contraction_upper exp_mass_upper upper by linarith
+    then show "1 / 2 \<le> 1 -
+      (1 - ?eta * (real ?m / real ?N) * (real ?n / real ?N)) ^ ?N"
+      by linarith
+  qed
+qed
+
+lemma power_anchor_tail_ratio_exact:
+  assumes tail_below_population: "c < a"
+  shows "real (power_anchor a c k) / real (power_tail c k) =
+    real (curriculum_scale k) ^ (a - c) - 1"
+proof -
+  let ?K = "real (curriculum_scale k)"
+  let ?N = "power_population a k"
+  let ?m = "power_tail c k"
+  let ?n = "power_anchor a c k"
+  have m_positive: "0 < ?m" by (rule power_tail_positive)
+  have m_real_nonzero: "real ?m \<noteq> 0" using m_positive by simp
+  have m_le_N: "?m \<le> ?N" by (rule power_tail_le_population[OF tail_below_population])
+  have cast_anchor: "real ?n = real ?N - real ?m"
+    unfolding power_anchor_def using m_le_N by simp
+  have cast_factorization: "real ?N = real ?m * ?K ^ (a - c)"
+    using power_population_factorization[OF tail_below_population, of k] by simp
+  show ?thesis using cast_anchor cast_factorization m_real_nonzero
+    by (simp add: field_simps; algebra)
+qed
+
+lemma power_log_odds_exact:
+  assumes tail_below_population: "c < a"
+  shows "ln ((real (power_anchor a c k) / real (power_population a k)) /
+      (real (power_tail c k) / real (power_population a k))) =
+    ln (real (curriculum_scale k) ^ (a - c) - 1)"
+proof -
+  have N_positive: "0 < real (power_population a k)"
+    using power_population_positive[of a k] by simp
+  have m_positive: "0 < real (power_tail c k)"
+    using power_tail_positive[of c k] by simp
+  have ratio_identity:
+    "(real (power_anchor a c k) / real (power_population a k)) /
+      (real (power_tail c k) / real (power_population a k)) =
+      real (power_anchor a c k) / real (power_tail c k)"
+    using N_positive m_positive by (simp add: field_simps)
+  show ?thesis
+    using ratio_identity power_anchor_tail_ratio_exact[OF tail_below_population, of k]
+    by simp
+qed
+
+lemma power_log_odds_filterlim:
+  assumes tail_below_population: "c < a"
+  shows "filterlim (\<lambda>k. ln (real (curriculum_scale k) ^ (a - c) - 1))
+    at_top sequentially"
+proof -
+  have gap_positive: "0 < a - c" using tail_below_population by simp
+  show ?thesis unfolding filterlim_at_top
+  proof
+    fix z :: real
+    have base_eventually: "\<forall>\<^sub>F k in sequentially.
+        z \<le> ln (real (curriculum_scale k) - 1)"
+      using curriculum_log_odds_filterlim unfolding filterlim_at_top by blast
+    show "\<forall>\<^sub>F k in sequentially.
+      z \<le> ln (real (curriculum_scale k) ^ (a - c) - 1)"
+    proof (rule eventually_mono[OF base_eventually])
+      fix k
+      assume lower: "z \<le> ln (real (curriculum_scale k) - 1)"
+      let ?K = "real (curriculum_scale k)"
+      have K_at_least_four: "4 \<le> ?K"
+        using curriculum_scale_at_least_four[of k] by simp
+      have K_at_least_one: "1 \<le> ?K" using K_at_least_four by linarith
+      have decomposition: "a - c = 1 + (a - c - 1)"
+        using gap_positive by simp
+      have extra_at_least_one: "1 \<le> ?K ^ (a - c - 1)"
+        by (rule one_le_power[OF K_at_least_one])
+      have K_le_power: "?K \<le> ?K ^ (a - c)"
+      proof -
+        have "?K \<le> ?K * ?K ^ (a - c - 1)"
+          using extra_at_least_one K_at_least_one by simp
+        also have "\<dots> = ?K ^ (a - c)"
+          using decomposition by (simp add: power_add)
+        finally show ?thesis .
+      qed
+      have argument_positive: "0 < ?K - 1" using K_at_least_four by linarith
+      have log_mono: "ln (?K - 1) \<le> ln (?K ^ (a - c) - 1)"
+        by (rule ln_mono) (use K_le_power argument_positive in linarith)+
+      show "z \<le> ln (?K ^ (a - c) - 1)" using lower log_mono by linarith
+    qed
+  qed
+qed
+
+definition power_random_error :: "nat \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> real" where
+  "power_random_error a b k = power_learning_rate b k *
+    sqrt (real (power_population a k) / 2 *
+      ln (2 * real (power_population a k) / power_confidence k))"
+
+lemma power_random_log_argument:
+  "2 * real (power_population a k) / power_confidence k =
+    2 * real (curriculum_scale k) ^ (a + 2)"
+proof -
+  let ?K = "real (curriculum_scale k)"
+  have K_nonzero: "?K \<noteq> 0"
+    using curriculum_scale_at_least_four[of k] by simp
+  have power_sum: "?K ^ (a + 2) = ?K ^ a * ?K ^ 2" by (rule power_add)
+  show ?thesis
+    unfolding power_population_def power_confidence_def of_nat_power
+    using K_nonzero power_sum by (simp add: field_simps)
+qed
+
+lemma power_random_log_nonnegative:
+  "0 \<le> ln (2 * real (power_population a k) / power_confidence k)"
+proof -
+  let ?K = "real (curriculum_scale k)"
+  have K_at_least_one: "1 \<le> ?K"
+    using curriculum_scale_at_least_four[of k] by simp
+  have power_at_least_one: "1 \<le> ?K ^ (a + 2)"
+    by (rule one_le_power[OF K_at_least_one])
+  have "0 \<le> ln (2 * ?K ^ (a + 2))" using power_at_least_one by simp
+  then show ?thesis using power_random_log_argument[of a k] by simp
+qed
+
+lemma power_random_error_nonnegative:
+  "0 \<le> power_random_error a b k"
+proof -
+  have inside_nonnegative: "0 \<le> real (power_population a k) / 2 *
+      ln (2 * real (power_population a k) / power_confidence k)"
+    by (rule mult_nonneg_nonneg) (use power_random_log_nonnegative[of a k] in simp_all)
+  have root_nonnegative: "0 \<le> sqrt (real (power_population a k) / 2 *
+      ln (2 * real (power_population a k) / power_confidence k))"
+    by (rule real_sqrt_ge_zero[OF inside_nonnegative])
+  show ?thesis unfolding power_random_error_def
+    by (rule mult_nonneg_nonneg[OF _ root_nonnegative])
+      (use power_learning_rate_positive[of b k] in linarith)
+qed
+
+lemma power_noise_mass_exact:
+  assumes noise_condition: "a < 2 * b"
+  shows "power_learning_rate b k ^ 2 * real (power_population a k) =
+    1 / real (curriculum_scale k) ^ (2 * b - a)"
+proof -
+  let ?K = "real (curriculum_scale k)"
+  have K_nonzero: "?K \<noteq> 0"
+    using curriculum_scale_at_least_four[of k] by simp
+  have exponent: "a + (2 * b - a) = 2 * b" using noise_condition by simp
+  have denominator_factor: "?K ^ (2 * b) = ?K ^ a * ?K ^ (2 * b - a)"
+  proof -
+    have "?K ^ (2 * b) = ?K ^ (a + (2 * b - a))" using exponent by simp
+    also have "\<dots> = ?K ^ a * ?K ^ (2 * b - a)" by (rule power_add)
+    finally show ?thesis .
+  qed
+  have square_power: "(?K ^ b)^2 = ?K ^ (2 * b)"
+  proof -
+    have "(?K ^ b)^2 = ?K ^ (b * 2)" by (rule power_mult[symmetric])
+    also have "\<dots> = ?K ^ (2 * b)" by (simp add: mult.commute)
+    finally show ?thesis .
+  qed
+  show ?thesis
+    unfolding power_learning_rate_def power_population_def of_nat_power
+    using K_nonzero denominator_factor square_power by (simp add: field_simps)
+qed
+
+lemma power_random_error_square:
+  assumes noise_condition: "a < 2 * b"
+  shows "power_random_error a b k ^ 2 =
+    ln (2 * real (curriculum_scale k) ^ (a + 2)) /
+      (2 * real (curriculum_scale k) ^ (2 * b - a))"
+proof -
+  let ?L = "ln (2 * real (power_population a k) / power_confidence k)"
+  let ?X = "real (power_population a k) / 2 * ?L"
+  have X_nonnegative: "0 \<le> ?X"
+    by (rule mult_nonneg_nonneg) (use power_random_log_nonnegative[of a k] in simp_all)
+  have square_expansion: "power_random_error a b k ^ 2 =
+      power_learning_rate b k ^ 2 * ?X"
+    unfolding power_random_error_def
+    using X_nonnegative by (simp add: power_mult_distrib)
+  have mass_exact: "power_learning_rate b k ^ 2 *
+      real (power_population a k) =
+      1 / real (curriculum_scale k) ^ (2 * b - a)"
+    by (rule power_noise_mass_exact[OF noise_condition])
+  have logarithm_exact: "?L = ln (2 * real (curriculum_scale k) ^ (a + 2))"
+    using power_random_log_argument[of a k] by simp
+  have regrouped: "power_random_error a b k ^ 2 =
+      (power_learning_rate b k ^ 2 * real (power_population a k)) * ?L / 2"
+    using square_expansion by algebra
+  have substituted: "power_random_error a b k ^ 2 =
+      (1 / real (curriculum_scale k) ^ (2 * b - a)) * ?L / 2"
+    using regrouped mass_exact by simp
+  have denominator_nonzero: "real (curriculum_scale k) ^ (2 * b - a) \<noteq> 0"
+    using curriculum_scale_at_least_four[of k] by simp
+  show ?thesis
+    using substituted logarithm_exact denominator_nonzero
+    by (simp add: field_simps; algebra)
+qed
+
+lemma power_random_error_square_tendsto_zero:
+  assumes noise_condition: "a < 2 * b"
+  shows "((\<lambda>k. power_random_error a b k ^ 2) \<longlongrightarrow> 0) sequentially"
+proof -
+  let ?K = "\<lambda>k. real (curriculum_scale k)"
+  let ?d = "2 * b - a"
+  let ?L = "\<lambda>k. ln (2 * ?K k ^ (a + 2))"
+  have d_positive: "0 < ?d" using noise_condition by simp
+  have inverse_limit: "((\<lambda>k. 1 / ?K k) \<longlongrightarrow> 0) sequentially"
+    using inverse_curriculum_power_tendsto_zero[of 1] by simp
+  have constant_limit: "((\<lambda>k. (ln 2 / 2) * (1 / ?K k)) \<longlongrightarrow> 0) sequentially"
+    using tendsto_mult[OF tendsto_const inverse_limit, of "ln 2 / 2"] by simp
+  have log_limit: "((\<lambda>k. (real (a + 2) / 2) *
+      (ln (?K k) / ?K k)) \<longlongrightarrow> 0) sequentially"
+    using tendsto_mult[OF tendsto_const curriculum_log_scale_over_scale_tendsto_zero,
+      of "real (a + 2) / 2"] by simp
+  have upper_limit: "((\<lambda>k. ?L k / (2 * ?K k)) \<longlongrightarrow> 0) sequentially"
+  proof -
+    have sum_limit: "((\<lambda>k. (ln 2 / 2) * (1 / ?K k) +
+      (real (a + 2) / 2) * (ln (?K k) / ?K k)) \<longlongrightarrow> 0) sequentially"
+      using tendsto_add[OF constant_limit log_limit] by simp
+    have identity: "?L k / (2 * ?K k) =
+      (ln 2 / 2) * (1 / ?K k) +
+      (real (a + 2) / 2) * (ln (?K k) / ?K k)" for k
+    proof -
+      have K_positive: "0 < ?K k"
+        using curriculum_scale_at_least_four[of k] by simp
+      have logarithm_identity: "?L k = ln 2 + real (a + 2) * ln (?K k)"
+      proof -
+        have "?L k = ln 2 + ln (?K k ^ (a + 2))"
+          using K_positive by (simp add: ln_mult)
+        also have "\<dots> = ln 2 + real (a + 2) * ln (?K k)"
+          by (simp only: ln_realpow)
+        finally show ?thesis .
+      qed
+      have inverse_product: "inverse (2 * ?K k) =
+          inverse 2 * inverse (?K k)" by simp
+      show ?thesis
+        unfolding field_class.field_divide_inverse
+        using logarithm_identity inverse_product by algebra
+    qed
+    have function_identity:
+      "(\<lambda>k. ?L k / (2 * ?K k)) = (\<lambda>k.
+        (ln 2 / 2) * (1 / ?K k) +
+        (real (a + 2) / 2) * (ln (?K k) / ?K k))"
+      by (rule ext) (rule identity)
+    show ?thesis unfolding function_identity by (rule sum_limit)
+  qed
+  have lower_bound: "\<forall>\<^sub>F k in sequentially. 0 \<le> power_random_error a b k ^ 2"
+    by (intro always_eventually allI) simp
+  have upper_bound: "\<forall>\<^sub>F k in sequentially.
+      power_random_error a b k ^ 2 \<le> ?L k / (2 * ?K k)"
+  proof (intro always_eventually allI)
+    fix k
+    have K_at_least_one: "1 \<le> ?K k"
+      using curriculum_scale_at_least_four[of k] by simp
+    have decomposition: "?d = 1 + (?d - 1)" using d_positive by simp
+    have extra_at_least_one: "1 \<le> ?K k ^ (?d - 1)"
+      by (rule one_le_power[OF K_at_least_one])
+    have K_le_power: "?K k \<le> ?K k ^ ?d"
+    proof -
+      have "?K k \<le> ?K k * ?K k ^ (?d - 1)"
+        using extra_at_least_one K_at_least_one by simp
+      also have "\<dots> = ?K k ^ ?d" using decomposition by (simp add: power_add)
+      finally show ?thesis .
+    qed
+    have L_nonnegative: "0 \<le> ?L k"
+      using power_random_log_nonnegative[of a k]
+        power_random_log_argument[of a k] by simp
+    have denominator_positive: "0 < 2 * ?K k" using K_at_least_one by linarith
+    have fraction_mono: "?L k / (2 * ?K k ^ ?d) \<le> ?L k / (2 * ?K k)"
+      by (rule divide_left_mono) (use K_le_power L_nonnegative denominator_positive in simp_all)
+    show "power_random_error a b k ^ 2 \<le> ?L k / (2 * ?K k)"
+      using power_random_error_square[OF noise_condition, of k] fraction_mono by simp
+  qed
+  show ?thesis
+    by (rule tendsto_sandwich[OF lower_bound upper_bound tendsto_const upper_limit])
+qed
+
+lemma power_random_error_tendsto_zero:
+  assumes noise_condition: "a < 2 * b"
+  shows "((\<lambda>k. power_random_error a b k) \<longlongrightarrow> 0) sequentially"
+proof -
+  have square_limit: "((\<lambda>k. power_random_error a b k ^ 2) \<longlongrightarrow> 0) sequentially"
+    by (rule power_random_error_square_tendsto_zero[OF noise_condition])
+  have root_limit: "((\<lambda>k. sqrt (power_random_error a b k ^ 2)) \<longlongrightarrow> sqrt 0) sequentially"
+    by (rule tendsto_real_sqrt[OF square_limit])
+  have function_identity: "(\<lambda>k. sqrt (power_random_error a b k ^ 2)) =
+      (\<lambda>k. power_random_error a b k)"
+  proof (rule ext)
+    fix k
+    show "sqrt (power_random_error a b k ^ 2) = power_random_error a b k"
+      using power_random_error_nonnegative[of a b k] by simp
+  qed
+  show ?thesis using root_limit function_identity by simp
+qed
+
+lemma power_random_margin_exact:
+  assumes tail_below_population: "c < a"
+  shows "random_order_lower_margin
+      (power_learning_rate b k) (power_anchor a c k)
+      (power_tail c k) (power_population a k) (power_confidence k) =
+    ln (real (curriculum_scale k) ^ (a - c) - 1) *
+      (1 - (1 - power_learning_rate b k *
+        (real (power_tail c k) / real (power_population a k)) *
+        (real (power_anchor a c k) / real (power_population a k))) ^
+        power_population a k) - power_random_error a b k"
+  unfolding random_order_lower_margin_def power_random_error_def
+  using power_log_odds_exact[OF tail_below_population, where k=k]
+  by simp
+
+lemma power_random_margin_eventually_gt_one:
+  assumes noise_condition: "a < 2 * b"
+    and rate_below_tail: "b < c"
+    and tail_below_population: "c < a"
+  shows "\<forall>\<^sub>F k in sequentially.
+    1 < random_order_lower_margin
+      (power_learning_rate b k) (power_anchor a c k)
+      (power_tail c k) (power_population a k) (power_confidence k)"
+proof -
+  have logarithm_large: "\<forall>\<^sub>F k in sequentially.
+      4 \<le> ln (real (curriculum_scale k) ^ (a - c) - 1)"
+    using power_log_odds_filterlim[OF tail_below_population]
+    unfolding filterlim_at_top by simp
+  have error_small: "\<forall>\<^sub>F k in sequentially. power_random_error a b k < 1"
+    using order_tendstoD(2)[OF power_random_error_tendsto_zero[OF noise_condition],
+      of "1"] by simp
+  note combined = eventually_conj[OF logarithm_large
+      eventually_conj[OF power_contraction_factor_eventually_half[OF
+        rate_below_tail tail_below_population] error_small]]
+  show ?thesis
+  proof (rule eventually_mono[OF combined])
+    fix k
+    assume facts: "4 \<le> ln (real (curriculum_scale k) ^ (a - c) - 1) \<and>
+      1 / 2 \<le> 1 -
+        (1 - power_learning_rate b k *
+          (real (power_tail c k) / real (power_population a k)) *
+          (real (power_anchor a c k) / real (power_population a k))) ^
+          power_population a k \<and>
+      power_random_error a b k < 1"
+    let ?L = "ln (real (curriculum_scale k) ^ (a - c) - 1)"
+    let ?C = "1 -
+      (1 - power_learning_rate b k *
+        (real (power_tail c k) / real (power_population a k)) *
+        (real (power_anchor a c k) / real (power_population a k))) ^
+        power_population a k"
+    have L_nonnegative: "0 \<le> ?L" using facts by linarith
+    have C_nonnegative: "0 \<le> ?C" using facts by linarith
+    have product_lower: "4 * (1 / 2) \<le> ?L * ?C"
+      by (rule mult_mono) (use facts L_nonnegative C_nonnegative in linarith)+
+    have margin_identity: "random_order_lower_margin
+        (power_learning_rate b k) (power_anchor a c k)
+        (power_tail c k) (power_population a k) (power_confidence k) =
+      ?L * ?C - power_random_error a b k"
+      by (rule power_random_margin_exact[OF tail_below_population])
+    show "1 < random_order_lower_margin
+      (power_learning_rate b k) (power_anchor a c k)
+      (power_tail c k) (power_population a k) (power_confidence k)"
+      using product_lower facts margin_identity by linarith
+  qed
+qed
+
+definition power_random_benign_event :: "nat \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> bool list set" where
+  "power_random_benign_event a b c k = {xs.
+    clean_test_risk (power_tail_ratio a c k)
+      (binary_logistic_state (power_learning_rate b k)
+        (real (power_anchor a c k) / real (power_population a k)) xs
+        (power_population a k)) = power_tail_ratio a c k \<and>
+    clean_test_auc (power_tail_ratio a c k)
+      (binary_logistic_state (power_learning_rate b k)
+        (real (power_anchor a c k) / real (power_population a k)) xs
+        (power_population a k)) = 1 - power_tail_ratio a c k}"
+
+lemma power_law_inversion_eventually:
+  assumes noise_condition: "a < 2 * b"
+    and rate_below_tail: "b < c"
+    and tail_below_population: "c < a"
+  shows "\<forall>\<^sub>F k in sequentially.
+    clean_test_risk (power_tail_ratio a c k)
+      (attack_state (power_learning_rate b k)
+        (power_anchor a c k) (power_tail c k)) =
+      1 - power_tail_ratio a c k \<and>
+    clean_test_auc (power_tail_ratio a c k)
+      (attack_state (power_learning_rate b k)
+        (power_anchor a c k) (power_tail c k)) =
+      power_tail_ratio a c k \<and>
+    1 - power_confidence k \<le>
+      uniform_probability
+        (binary_orders (power_anchor a c k) (power_population a k))
+        (power_random_benign_event a b c k)"
+proof -
+  note asymptotic = eventually_conj[OF
+    power_tail_takeover_eventually[OF rate_below_tail tail_below_population]
+    power_random_margin_eventually_gt_one[OF noise_condition rate_below_tail
+      tail_below_population]]
+  show ?thesis
+  proof (rule eventually_mono[OF asymptotic])
+    fix k
+    assume limits: "ln (1 + real (power_anchor a c k) *
+        (exp (power_learning_rate b k) - 1)) + 1 <
+      power_learning_rate b k * real (power_tail c k) / (1 + exp 1) \<and>
+      1 < random_order_lower_margin (power_learning_rate b k)
+        (power_anchor a c k) (power_tail c k) (power_population a k)
+        (power_confidence k)"
+    let ?N = "power_population a k"
+    let ?m = "power_tail c k"
+    let ?n = "power_anchor a c k"
+    let ?eta = "power_learning_rate b k"
+    let ?delta = "power_confidence k"
+    let ?epsilon = "power_tail_ratio a c k"
+    have N_positive: "0 < ?N" by (rule power_population_positive)
+    have counts: "?m + ?n = ?N"
+      by (rule power_counts[OF tail_below_population])
+    have m_positive: "0 < ?m" by (rule power_tail_positive)
+    have m_less_n: "?m < ?n"
+      by (rule power_tail_less_anchor[OF tail_below_population])
+    have eta_positive: "0 < ?eta" by (rule power_learning_rate_positive)
+    have eta_at_most_four: "?eta \<le> 4"
+      using power_learning_rate_at_most_one[of b k] by linarith
+    have delta_positive: "0 < ?delta" by (rule power_confidence_positive)
+    have delta_at_most_one: "?delta \<le> 1"
+      by (rule power_confidence_at_most_one)
+    have epsilon_nonnegative: "0 \<le> ?epsilon"
+      unfolding power_tail_ratio_def by simp
+    have epsilon_below_half: "?epsilon < 1 / 2"
+    proof -
+      have N_less_twice_anchor: "real ?N < 2 * real ?n"
+        using counts m_less_n by simp
+      have twice_tail_less_N: "2 * real ?m < real ?N"
+        using counts N_less_twice_anchor by simp
+      show ?thesis unfolding power_tail_ratio_def
+        using N_positive twice_tail_less_N
+        by (simp add: pos_less_divide_eq; linarith)
+    qed
+    have random_margin_positive:
+      "0 < random_order_lower_margin ?eta ?n ?m ?N ?delta"
+      using limits by linarith
+    note inversion = finite_pool_order_only_inversion[OF N_positive counts
+      m_positive m_less_n eta_positive eta_at_most_four _ delta_positive
+      delta_at_most_one epsilon_nonnegative epsilon_below_half _
+      random_margin_positive, of "1"]
+    have gamma_positive: "0 < (1::real)" by simp
+    have attack_risk: "clean_test_risk ?epsilon (attack_state ?eta ?n ?m) =
+        1 - ?epsilon"
+      by (rule finite_pool_order_only_inversion(1)[OF N_positive counts
+        m_positive m_less_n eta_positive eta_at_most_four gamma_positive
+        delta_positive delta_at_most_one epsilon_nonnegative epsilon_below_half])
+        (use limits random_margin_positive in linarith)+
+    have attack_auc: "clean_test_auc ?epsilon (attack_state ?eta ?n ?m) =
+        ?epsilon"
+      by (rule finite_pool_order_only_inversion(2)[OF N_positive counts
+        m_positive m_less_n eta_positive eta_at_most_four gamma_positive
+        delta_positive delta_at_most_one epsilon_nonnegative epsilon_below_half])
+        (use limits random_margin_positive in linarith)+
+    have strong_probability: "1 - ?delta \<le> uniform_probability
+      (binary_orders ?n ?N)
+      {xs. clean_test_risk ?epsilon
+          (binary_logistic_state ?eta (real ?n / real ?N) xs ?N) = ?epsilon \<and>
+        clean_test_auc ?epsilon
+          (binary_logistic_state ?eta (real ?n / real ?N) xs ?N) = 1 - ?epsilon \<and>
+        clean_test_risk ?epsilon
+          (binary_logistic_state ?eta (real ?n / real ?N) xs ?N) <
+          clean_test_risk ?epsilon (attack_state ?eta ?n ?m) \<and>
+        clean_test_auc ?epsilon (attack_state ?eta ?n ?m) <
+          clean_test_auc ?epsilon
+            (binary_logistic_state ?eta (real ?n / real ?N) xs ?N)}"
+      by (rule finite_pool_order_only_inversion(3)[OF N_positive counts
+        m_positive m_less_n eta_positive eta_at_most_four gamma_positive
+        delta_positive delta_at_most_one epsilon_nonnegative epsilon_below_half])
+        (use limits random_margin_positive in linarith)+
+    have event_subset: "{xs. clean_test_risk ?epsilon
+          (binary_logistic_state ?eta (real ?n / real ?N) xs ?N) = ?epsilon \<and>
+        clean_test_auc ?epsilon
+          (binary_logistic_state ?eta (real ?n / real ?N) xs ?N) = 1 - ?epsilon \<and>
+        clean_test_risk ?epsilon
+          (binary_logistic_state ?eta (real ?n / real ?N) xs ?N) <
+          clean_test_risk ?epsilon (attack_state ?eta ?n ?m) \<and>
+        clean_test_auc ?epsilon (attack_state ?eta ?n ?m) <
+          clean_test_auc ?epsilon
+            (binary_logistic_state ?eta (real ?n / real ?N) xs ?N)} \<subseteq>
+        power_random_benign_event a b c k"
+      unfolding power_random_benign_event_def by blast
+    have probability_mono: "uniform_probability (binary_orders ?n ?N)
+        {xs. clean_test_risk ?epsilon
+          (binary_logistic_state ?eta (real ?n / real ?N) xs ?N) = ?epsilon \<and>
+        clean_test_auc ?epsilon
+          (binary_logistic_state ?eta (real ?n / real ?N) xs ?N) = 1 - ?epsilon \<and>
+        clean_test_risk ?epsilon
+          (binary_logistic_state ?eta (real ?n / real ?N) xs ?N) <
+          clean_test_risk ?epsilon (attack_state ?eta ?n ?m) \<and>
+        clean_test_auc ?epsilon (attack_state ?eta ?n ?m) <
+          clean_test_auc ?epsilon
+            (binary_logistic_state ?eta (real ?n / real ?N) xs ?N)} \<le>
+      uniform_probability (binary_orders ?n ?N)
+        (power_random_benign_event a b c k)"
+      by (rule uniform_probability_mono[OF finite_binary_orders event_subset])
+    show "clean_test_risk ?epsilon (attack_state ?eta ?n ?m) =
+        1 - ?epsilon \<and>
+      clean_test_auc ?epsilon (attack_state ?eta ?n ?m) = ?epsilon \<and>
+      1 - ?delta \<le> uniform_probability (binary_orders ?n ?N)
+        (power_random_benign_event a b c k)"
+      using attack_risk attack_auc strong_probability probability_mono by linarith
+  qed
+qed
+
+definition power_random_benign_probability :: "nat \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> real" where
+  "power_random_benign_probability a b c k = uniform_probability
+    (binary_orders (power_anchor a c k) (power_population a k))
+    (power_random_benign_event a b c k)"
+
+lemma power_random_benign_probability_tendsto_one:
+  assumes noise_condition: "a < 2 * b"
+    and rate_below_tail: "b < c"
+    and tail_below_population: "c < a"
+  shows "((\<lambda>k. power_random_benign_probability a b c k) \<longlongrightarrow> 1) sequentially"
+proof -
+  have lower_limit: "((\<lambda>k. 1 - power_confidence k) \<longlongrightarrow> 1) sequentially"
+    using tendsto_diff[OF tendsto_const power_confidence_tendsto_zero] by simp
+  have lower_bound: "\<forall>\<^sub>F k in sequentially. 1 - power_confidence k \<le>
+      power_random_benign_probability a b c k"
+    using power_law_inversion_eventually[OF noise_condition rate_below_tail
+      tail_below_population]
+    unfolding power_random_benign_probability_def by eventually_elim simp
+  have upper_bound: "\<forall>\<^sub>F k in sequentially.
+      power_random_benign_probability a b c k \<le> 1"
+    by (intro always_eventually allI)
+      (simp add: power_random_benign_probability_def
+        uniform_probability_le_one[OF finite_binary_orders])
+  show ?thesis
+    by (rule tendsto_sandwich[OF lower_bound upper_bound lower_limit tendsto_const])
+qed
+
+lemma power_attack_metric_limits:
+  assumes noise_condition: "a < 2 * b"
+    and rate_below_tail: "b < c"
+    and tail_below_population: "c < a"
+  shows "((\<lambda>k.
+    (clean_test_risk (power_tail_ratio a c k)
+      (attack_state (power_learning_rate b k)
+        (power_anchor a c k) (power_tail c k)),
+     clean_test_auc (power_tail_ratio a c k)
+      (attack_state (power_learning_rate b k)
+        (power_anchor a c k) (power_tail c k)))) \<longlongrightarrow> (1, 0)) sequentially"
+proof -
+  have risk_reference: "((\<lambda>k. 1 - power_tail_ratio a c k) \<longlongrightarrow> 1) sequentially"
+    using tendsto_diff[OF tendsto_const
+      power_tail_ratio_tendsto_zero[OF tail_below_population]] by simp
+  note inversion = power_law_inversion_eventually[OF noise_condition
+    rate_below_tail tail_below_population]
+  have risk_identity: "\<forall>\<^sub>F k in sequentially. 1 - power_tail_ratio a c k =
+      clean_test_risk (power_tail_ratio a c k)
+        (attack_state (power_learning_rate b k)
+          (power_anchor a c k) (power_tail c k))"
+    using inversion by eventually_elim simp
+  have auc_identity: "\<forall>\<^sub>F k in sequentially. power_tail_ratio a c k =
+      clean_test_auc (power_tail_ratio a c k)
+        (attack_state (power_learning_rate b k)
+          (power_anchor a c k) (power_tail c k))"
+    using inversion by eventually_elim simp
+  have risk_limit: "((\<lambda>k. clean_test_risk (power_tail_ratio a c k)
+      (attack_state (power_learning_rate b k)
+        (power_anchor a c k) (power_tail c k))) \<longlongrightarrow> 1) sequentially"
+    by (rule Lim_transform_eventually[OF risk_reference risk_identity])
+  have auc_limit: "((\<lambda>k. clean_test_auc (power_tail_ratio a c k)
+      (attack_state (power_learning_rate b k)
+        (power_anchor a c k) (power_tail c k))) \<longlongrightarrow> 0) sequentially"
+    by (rule Lim_transform_eventually[OF
+      power_tail_ratio_tendsto_zero[OF tail_below_population] auc_identity])
+  show ?thesis by (intro tendsto_Pair risk_limit auc_limit)
+qed
+
+theorem power_law_order_only_inversion:
+  assumes noise_condition: "a < 2 * b"
+    and rate_below_tail: "b < c"
+    and tail_below_population: "c < a"
+  shows "((\<lambda>k. power_tail_ratio a c k) \<longlongrightarrow> 0) sequentially"
+    and "(power_confidence \<longlongrightarrow> 0) sequentially"
+    and "((\<lambda>k. power_random_benign_probability a b c k) \<longlongrightarrow> 1) sequentially"
+    and "((\<lambda>k.
+      (clean_test_risk (power_tail_ratio a c k)
+        (attack_state (power_learning_rate b k)
+          (power_anchor a c k) (power_tail c k)),
+       clean_test_auc (power_tail_ratio a c k)
+        (attack_state (power_learning_rate b k)
+          (power_anchor a c k) (power_tail c k)))) \<longlongrightarrow> (1, 0)) sequentially"
+  by (rule power_tail_ratio_tendsto_zero[OF tail_below_population],
+      rule power_confidence_tendsto_zero,
+      rule power_random_benign_probability_tendsto_one[OF noise_condition
+        rate_below_tail tail_below_population],
+      rule power_attack_metric_limits[OF noise_condition rate_below_tail
+        tail_below_population])
+
 primrec normed_additive_iteration ::
     "('a::real_normed_vector \<Rightarrow> 'a) \<Rightarrow> (nat \<Rightarrow> 'a) \<Rightarrow> 'a \<Rightarrow> nat \<Rightarrow> 'a" where
   "normed_additive_iteration F e x 0 = x"
@@ -4829,6 +6084,80 @@ proof -
         [where q="real (curriculum_anchor_count k) / real (curriculum_population k)"
           and G=1, OF rate_nonnegative mu_nonnegative mu_less_one
           effective_bound attack_reference error_bound])
+  qed
+qed
+
+lemma curriculum_fixed_momentum_attack_metrics_eventually:
+  fixes mu :: real
+  assumes mu_nonnegative: "0 \<le> mu" and mu_less_one: "mu < 1"
+  shows "\<forall>\<^sub>F k in sequentially.
+    clean_test_risk (curriculum_tail_ratio k)
+      (momentum_w_state (curriculum_learning_rate k) mu
+        (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
+        (curriculum_population k)) = 1 - curriculum_tail_ratio k \<and>
+    clean_test_auc (curriculum_tail_ratio k)
+      (momentum_w_state (curriculum_learning_rate k) mu
+        (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
+        (curriculum_population k)) = curriculum_tail_ratio k"
+proof -
+  show ?thesis
+  proof (rule eventually_mono[OF curriculum_fixed_momentum_attack_eventually_negative
+      [OF mu_nonnegative mu_less_one]])
+    fix k
+    assume negative: "momentum_w_state (curriculum_learning_rate k) mu
+      (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
+      (curriculum_population k) < 0"
+    show "clean_test_risk (curriculum_tail_ratio k)
+        (momentum_w_state (curriculum_learning_rate k) mu
+          (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
+          (curriculum_population k)) = 1 - curriculum_tail_ratio k \<and>
+      clean_test_auc (curriculum_tail_ratio k)
+        (momentum_w_state (curriculum_learning_rate k) mu
+          (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
+          (curriculum_population k)) = curriculum_tail_ratio k"
+      by (intro conjI clean_test_risk_negative[OF negative]
+        clean_test_auc_negative[OF negative])
+  qed
+qed
+
+theorem curriculum_fixed_momentum_attack_metric_limits:
+  fixes mu :: real
+  assumes mu_nonnegative: "0 \<le> mu" and mu_less_one: "mu < 1"
+  shows "((\<lambda>k.
+    (clean_test_risk (curriculum_tail_ratio k)
+      (momentum_w_state (curriculum_learning_rate k) mu
+        (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
+        (curriculum_population k)),
+     clean_test_auc (curriculum_tail_ratio k)
+      (momentum_w_state (curriculum_learning_rate k) mu
+        (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
+        (curriculum_population k)))) \<longlongrightarrow> (1, 0)) sequentially"
+proof (intro tendsto_Pair)
+  note metrics = curriculum_fixed_momentum_attack_metrics_eventually
+    [OF mu_nonnegative mu_less_one]
+  show "((\<lambda>k. clean_test_risk (curriculum_tail_ratio k)
+      (momentum_w_state (curriculum_learning_rate k) mu
+        (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
+        (curriculum_population k))) \<longlongrightarrow> 1) sequentially"
+  proof (rule Lim_transform_eventually[OF curriculum_clean_metric_limits(1)])
+    show "\<forall>\<^sub>F k in sequentially. 1 - curriculum_tail_ratio k =
+      clean_test_risk (curriculum_tail_ratio k)
+        (momentum_w_state (curriculum_learning_rate k) mu
+          (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
+          (curriculum_population k))"
+      using metrics by eventually_elim simp
+  qed
+  show "((\<lambda>k. clean_test_auc (curriculum_tail_ratio k)
+      (momentum_w_state (curriculum_learning_rate k) mu
+        (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
+        (curriculum_population k))) \<longlongrightarrow> 0) sequentially"
+  proof (rule Lim_transform_eventually[OF curriculum_tail_ratio_tendsto_zero])
+    show "\<forall>\<^sub>F k in sequentially. curriculum_tail_ratio k =
+      clean_test_auc (curriculum_tail_ratio k)
+        (momentum_w_state (curriculum_learning_rate k) mu
+          (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
+          (curriculum_population k))"
+      using metrics by eventually_elim simp
   qed
 qed
 

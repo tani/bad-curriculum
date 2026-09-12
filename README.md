@@ -82,12 +82,20 @@ layers:
 
 `order_only_inversion_complete_asymptotic` is unconditional: it combines the
 explicit scalar attack order, random-permutation event, realizable transfer and
-attack metric limits, and the exact zero-momentum reference trajectory. The
-integer power-law family supports `N = K^a`, tail size `K^c`, and learning rate
-`K^-b` throughout the region `a < 2b`, `b < c < a`; the anchor-tail
-specialization uses `c = a - 1`, including the concrete `(a,b) = (6,4)`
-corollary. Separate definitions record linear realizability and the stronger
-bounded uniform-margin property.
+attack metric limits, and the exact zero-momentum reference trajectory.
+`curriculum_realizable_random_benign_probability_tendsto_one` strengthens the
+random-order result to the realizable two-coordinate model without a
+conditioning assumption. For every fixed `0 <= mu < 1`,
+`curriculum_fixed_momentum_attack_metric_limits` proves that adversarial-order
+clean risk tends to one while AUC tends to zero.
+
+The generic theorem `power_law_order_only_inversion` carries the full inversion
+argument through the integer power-law family `N = K^a`, tail size `K^c`, and
+learning rate `K^-b` throughout `a < 2b`, `b < c < a`: tail ratio and confidence
+vanish, realizable random-order benign probability tends to one, and scalar
+attack metrics tend to `(1, 0)`. The anchor-tail specialization uses `c = a - 1`,
+including the concrete `(a,b) = (6,4)` corollary. Separate definitions record
+linear realizability and the stronger bounded uniform-margin property.
 Build the complete session with:
 
 ```bash
