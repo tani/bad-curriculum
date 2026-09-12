@@ -30,7 +30,7 @@ jobs:
       - name: Build Isabelle/HOL document
         run: |
           mkdir -p site
-          isabelle document -d formalization -O build/document Bad_Curriculum
+          /home/isabelle/Isabelle/bin/isabelle document -d formalization -O build/document Bad_Curriculum
           cp build/document/document.pdf site/Bad_Curriculum.pdf
           cp docs/index.html site/index.html
 
