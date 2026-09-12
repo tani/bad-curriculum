@@ -36,7 +36,6 @@
     th:last-child, td:last-child, th:nth-last-child(2), td:nth-last-child(2) { text-align: right; }
     code { background: var(--panel); padding: 0.15rem 0.35rem; border-radius: 0.2rem; }
     a { color: var(--accent); font-weight: 700; }
-    @media (prefers-color-scheme: dark) {
       :root { --paper: #171918; --ink: #e8e4dc; --muted: #b8b4ad; --accent: #ff8a62; --panel: #272926; --line: #41433f; }
     }
     @media (max-width: 560px) { .results { grid-template-columns: 1fr; } }
@@ -52,6 +51,11 @@
     <section class="results" aria-label="Recorded result summary">
       <article class="result"><strong>83.01%</strong>same-pool random-order accuracy</article>
       <article class="result"><strong>19.93%</strong>Anchor → Counterexample Tail accuracy</article>
+    </section>
+
+    <section>
+      <h2>Verified Isabelle/HOL document</h2>
+      <p>The <code>Bad_Curriculum</code> session formalizes finite-step inversion, random-permutation concentration, realizable two-coordinate transfer, generic power-law asymptotics, and fixed-momentum attack limits. This deployment builds it from the checked Isabelle sources; read the <a href="Bad_Curriculum.pdf">generated proof document</a>.</p>
     </section>
 
     <section>

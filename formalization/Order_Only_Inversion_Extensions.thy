@@ -1,52 +1,52 @@
 theory Order_Only_Inversion_Extensions
   imports Finite_Population_Hoeffding
 begin
-text \<open>linear_score: 線形モデルの重みと信号からスコアを定める。\<close>
+text \<open>線形モデルの重みと信号からスコアを定める。\<close>
 definition linear_score :: "real \<Rightarrow> real \<Rightarrow> real" where
   "linear_score w s = w * s"
 
-text \<open>clean_signed_margin: 更新後の分類マージンを評価する。\<close>
+text \<open>更新後の分類マージンを評価する。\<close>
 lemma clean_signed_margin:
   assumes signal_sign: "s = 1 \<or> s = -1"
   shows "clean_label s t * linear_score w s = w * t"
   using signal_sign unfolding clean_label_def linear_score_def
   by auto
 
-text \<open>zero_one_margin_loss: 符号付きマージンに対する零一損失を定める。\<close>
+text \<open>符号付きマージンに対する零一損失を定める。\<close>
 definition zero_one_margin_loss :: "real \<Rightarrow> real" where
   "zero_one_margin_loss z = (if 0 < z then 0 else 1)"
 
-text \<open>probability_parameter: 確率パラメータが単位区間に入る条件を定める。\<close>
+text \<open>確率パラメータが単位区間に入る条件を定める。\<close>
 definition probability_parameter :: "real \<Rightarrow> bool" where
   "probability_parameter epsilon \<longleftrightarrow> 0 \<le> epsilon \<and> epsilon \<le> 1"
 
-text \<open>probability_parameter_bounds: 誤差または状態の明示的な上界を与える。\<close>
+text \<open>誤差または状態の明示的な上界を与える。\<close>
 lemma probability_parameter_bounds:
   assumes "probability_parameter epsilon"
   shows "0 \<le> epsilon" and "epsilon \<le> 1"
   using assms unfolding probability_parameter_def by auto
 
-text \<open>clean_test_risk: 正常データと反転データを混ぜたテストリスクを定める。\<close>
+text \<open>正常データと反転データを混ぜたテストリスクを定める。\<close>
 definition clean_test_risk :: "real \<Rightarrow> real \<Rightarrow> real" where
   "clean_test_risk epsilon w =
     (1 - epsilon) * zero_one_margin_loss w +
       epsilon * zero_one_margin_loss (-w)"
 
-text \<open>clean_test_risk_positive: 対象量が正であること、または正側の評価を示す。\<close>
+text \<open>対象量が正であること、または正側の評価を示す。\<close>
 lemma clean_test_risk_positive:
   assumes w_positive: "0 < w"
   shows "clean_test_risk epsilon w = epsilon"
   using w_positive unfolding clean_test_risk_def zero_one_margin_loss_def
   by simp
 
-text \<open>clean_test_risk_negative: 対象量が負であること、または負側の評価を示す。\<close>
+text \<open>対象量が負であること、または負側の評価を示す。\<close>
 lemma clean_test_risk_negative:
   assumes w_negative: "w < 0"
   shows "clean_test_risk epsilon w = 1 - epsilon"
   using w_negative unfolding clean_test_risk_def zero_one_margin_loss_def
   by simp
 
-text \<open>clean_test_risk_reversal: スコアから導かれるリスクまたは AUC の値を計算する。\<close>
+text \<open>スコアから導かれるリスクまたは AUC の値を計算する。\<close>
 lemma clean_test_risk_reversal:
   assumes epsilon_nonnegative: "0 \<le> epsilon"
     and epsilon_below_half: "epsilon < 1 / 2"
@@ -68,13 +68,13 @@ proof -
     using attack_risk random_risk epsilon_below_half by linarith
 qed
 
-text \<open>auc_pair_credit: 正例スコアと負例スコアの一対比較に与える AUC 信用を定める。\<close>
+text \<open>正例スコアと負例スコアの一対比較に与える AUC 信用を定める。\<close>
 definition auc_pair_credit :: "real \<Rightarrow> real \<Rightarrow> real" where
   "auc_pair_credit positive_score negative_score =
     (if negative_score < positive_score then 1
      else if negative_score = positive_score then 1 / 2 else 0)"
 
-text \<open>clean_test_auc: 正常分布と反転分布のスコア比較から AUC を定める。\<close>
+text \<open>正常分布と反転分布のスコア比較から AUC を定める。\<close>
 definition clean_test_auc :: "real \<Rightarrow> real \<Rightarrow> real" where
   "clean_test_auc epsilon w =
     (1 - epsilon)^2 * auc_pair_credit w (-w) +
@@ -82,21 +82,21 @@ definition clean_test_auc :: "real \<Rightarrow> real \<Rightarrow> real" where
     epsilon * (1 - epsilon) * auc_pair_credit (-w) (-w) +
     epsilon^2 * auc_pair_credit (-w) w"
 
-text \<open>clean_test_auc_positive: 対象量が正であること、または正側の評価を示す。\<close>
+text \<open>対象量が正であること、または正側の評価を示す。\<close>
 lemma clean_test_auc_positive:
   assumes w_positive: "0 < w"
   shows "clean_test_auc epsilon w = 1 - epsilon"
   unfolding clean_test_auc_def auc_pair_credit_def
   using w_positive by (simp add: power2_eq_square algebra_simps)
 
-text \<open>clean_test_auc_negative: 対象量が負であること、または負側の評価を示す。\<close>
+text \<open>対象量が負であること、または負側の評価を示す。\<close>
 lemma clean_test_auc_negative:
   assumes w_negative: "w < 0"
   shows "clean_test_auc epsilon w = epsilon"
   unfolding clean_test_auc_def auc_pair_credit_def
   using w_negative by (simp add: power2_eq_square algebra_simps)
 
-text \<open>clean_test_auc_reversal: スコアから導かれるリスクまたは AUC の値を計算する。\<close>
+text \<open>スコアから導かれるリスクまたは AUC の値を計算する。\<close>
 lemma clean_test_auc_reversal:
   assumes attack_negative: "w_attack < 0"
     and random_positive: "0 < w_random"
@@ -105,19 +105,19 @@ lemma clean_test_auc_reversal:
   by (rule clean_test_auc_negative[OF attack_negative],
       rule clean_test_auc_positive[OF random_positive])
 
-text \<open>selector_signed_margin: セレクタの信号に対する符号付きマージンを定める。\<close>
+text \<open>セレクタの信号に対する符号付きマージンを定める。\<close>
 definition selector_signed_margin ::
     "real \<Rightarrow> real \<Rightarrow> real \<Rightarrow> real" where
   "selector_signed_margin a s t = clean_label s t * linear_score a s"
 
-text \<open>selector_signed_margin_eq: 更新後の分類マージンを評価する。\<close>
+text \<open>更新後の分類マージンを評価する。\<close>
 lemma selector_signed_margin_eq:
   assumes signal_sign: "s = 1 \<or> s = -1"
   shows "selector_signed_margin a s t = a * t"
   unfolding selector_signed_margin_def
   by (rule clean_signed_margin[OF signal_sign])
 
-text \<open>selector_misclassifies_iff_tail: 定義と後続の反転解析で用いる基本性質を示す。\<close>
+text \<open>定義と後続の反転解析で用いる基本性質を示す。\<close>
 lemma selector_misclassifies_iff_tail:
   assumes selector_positive: "0 < a"
     and signal_sign: "s = 1 \<or> s = -1"
@@ -126,49 +126,49 @@ lemma selector_misclassifies_iff_tail:
   unfolding selector_signed_margin_eq[OF signal_sign]
   using selector_positive subgroup_sign by auto
 
-text \<open>structured_example: 信号、サブグループ、識別子からなる構造化データ型を表す。\<close>
+text \<open>信号、サブグループ、識別子からなる構造化データ型を表す。\<close>
 type_synonym structured_example = "real \<times> real \<times> (bool \<times> nat)"
 
-text \<open>example_label: 構造化例のクリーンラベルを取り出す。\<close>
+text \<open>構造化例のクリーンラベルを取り出す。\<close>
 definition example_label :: "structured_example \<Rightarrow> real" where
   "example_label x = (case x of (s, t, r) \<Rightarrow> s * t)"
 
-text \<open>example_identity: 構造化例の識別子を取り出す。\<close>
+text \<open>構造化例の識別子を取り出す。\<close>
 definition example_identity :: "structured_example \<Rightarrow> bool \<times> nat" where
   "example_identity x = (case x of (s, t, r) \<Rightarrow> r)"
 
-text \<open>example_signal: 構造化例の信号座標を取り出す。\<close>
+text \<open>構造化例の信号座標を取り出す。\<close>
 definition example_signal :: "structured_example \<Rightarrow> real" where
   "example_signal x = (case x of (s, t, r) \<Rightarrow> s)"
 
-text \<open>example_score: 重み付き構造化例スコアを定める。\<close>
+text \<open>重み付き構造化例スコアを定める。\<close>
 definition example_score :: "real \<Rightarrow> structured_example \<Rightarrow> real" where
   "example_score w x = w * example_signal x"
 
-text \<open>example_margin_loss: 構造化例の分類マージン損失を定める。\<close>
+text \<open>構造化例の分類マージン損失を定める。\<close>
 definition example_margin_loss :: "real \<Rightarrow> structured_example \<Rightarrow> real" where
   "example_margin_loss w x =
     zero_one_margin_loss (example_label x * example_score w x)"
 
-text \<open>empirical_risk: 有限リスト上の経験リスクを定める。\<close>
+text \<open>有限リスト上の経験リスクを定める。\<close>
 definition empirical_risk :: "structured_example list \<Rightarrow> real \<Rightarrow> real" where
   "empirical_risk xs w =
     (if xs = [] then 0
      else sum_list (map (example_margin_loss w) xs) / real (length xs))"
 
-text \<open>positive_scores: ラベルが正の例のスコア列を抽出する。\<close>
+text \<open>ラベルが正の例のスコア列を抽出する。\<close>
 definition positive_scores ::
     "structured_example list \<Rightarrow> real \<Rightarrow> real list" where
   "positive_scores xs w =
     map (example_score w) (filter (\<lambda>x. example_label x = 1) xs)"
 
-text \<open>negative_scores: ラベルが負の例のスコア列を抽出する。\<close>
+text \<open>ラベルが負の例のスコア列を抽出する。\<close>
 definition negative_scores ::
     "structured_example list \<Rightarrow> real \<Rightarrow> real list" where
   "negative_scores xs w =
     map (example_score w) (filter (\<lambda>x. example_label x = -1) xs)"
 
-text \<open>empirical_auc: 有限リストから経験 AUC を定める。\<close>
+text \<open>有限リストから経験 AUC を定める。\<close>
 definition empirical_auc :: "structured_example list \<Rightarrow> real \<Rightarrow> real" where
   "empirical_auc xs w =
     (let ps = positive_scores xs w; ns = negative_scores xs w in
@@ -176,18 +176,18 @@ definition empirical_auc :: "structured_example list \<Rightarrow> real \<Righta
       else sum_list (map (\<lambda>p. sum_list (map (auc_pair_credit p) ns)) ps) /
         (real (length ps) * real (length ns)))"
 
-text \<open>balanced_block: 一つのサブグループについて符号を均衡させたブロックを構成する。\<close>
+text \<open>一つのサブグループについて符号を均衡させたブロックを構成する。\<close>
 definition balanced_block :: "real \<Rightarrow> nat \<Rightarrow> structured_example list" where
   "balanced_block t k =
     map (\<lambda>i. (1, t, (True, i))) [0..<k] @
     map (\<lambda>i. (-1, t, (False, i))) [0..<k]"
 
-text \<open>balanced_block_length: 定義と後続の反転解析で用いる基本性質を示す。\<close>
+text \<open>定義と後続の反転解析で用いる基本性質を示す。\<close>
 lemma balanced_block_length:
   "length (balanced_block t k) = 2 * k"
   unfolding balanced_block_def by simp
 
-text \<open>map_constant_upt: 定義と後続の反転解析で用いる基本性質を示す。\<close>
+text \<open>定義と後続の反転解析で用いる基本性質を示す。\<close>
 lemma map_constant_upt:
   "map (\<lambda>i. c) [0..<k] = replicate k c"
 proof (rule nth_equalityI)
@@ -199,13 +199,13 @@ proof (rule nth_equalityI)
     by simp
 qed
 
-text \<open>balanced_test_pool: アンカーとテールの均衡ブロックを連結したテスト母集団を定める。\<close>
+text \<open>アンカーとテールの均衡ブロックを連結したテスト母集団を定める。\<close>
 definition balanced_test_pool ::
     "nat \<Rightarrow> nat \<Rightarrow> structured_example list" where
   "balanced_test_pool anchor_count tail_count =
     balanced_block 1 anchor_count @ balanced_block (-1) tail_count"
 
-text \<open>balanced_block_margin_losses: 更新後の分類マージンを評価する。\<close>
+text \<open>更新後の分類マージンを評価する。\<close>
 lemma balanced_block_margin_losses:
   "map (example_margin_loss w) (balanced_block t k) =
     replicate (2 * k) (zero_one_margin_loss (w * t))"
@@ -228,7 +228,7 @@ lemma balanced_block_margin_losses:
     by (simp only: mult_2 replicate_add)
 qed
 
-text \<open>empirical_risk_balanced_test_pool: スコアから導かれるリスクまたは AUC の値を計算する。\<close>
+text \<open>スコアから導かれるリスクまたは AUC の値を計算する。\<close>
 lemma empirical_risk_balanced_test_pool:
   assumes nonempty: "0 < anchor_count + tail_count"
   shows "empirical_risk (balanced_test_pool anchor_count tail_count) w =
@@ -287,7 +287,7 @@ proof -
     done
 qed
 
-text \<open>balanced_block_labels: 定義と後続の反転解析で用いる基本性質を示す。\<close>
+text \<open>定義と後続の反転解析で用いる基本性質を示す。\<close>
 lemma balanced_block_labels:
   "map example_label (balanced_block t k) =
     replicate k t @ replicate k (-t)"
@@ -306,14 +306,14 @@ proof -
 
 qed
 
-text \<open>map_upt_ext_constant: 定義と後続の反転解析で用いる基本性質を示す。\<close>
+text \<open>定義と後続の反転解析で用いる基本性質を示す。\<close>
 lemma map_upt_ext_constant:
   assumes pointwise: "\<And>i. i < k \<Longrightarrow> f i = c"
   shows "map f [0..<k] = replicate k c"
   unfolding map_constant_upt[symmetric]
   by (rule map_cong) (use pointwise in auto)
 
-text \<open>balanced_block_positive_scores: スコアから導かれるリスクまたは AUC の値を計算する。\<close>
+text \<open>スコアから導かれるリスクまたは AUC の値を計算する。\<close>
 lemma balanced_block_positive_scores:
   assumes subgroup_sign: "t = 1 \<or> t = -1"
   shows "positive_scores (balanced_block t k) w =
@@ -342,7 +342,7 @@ lemma balanced_block_positive_scores:
     done
 qed
 
-text \<open>balanced_block_negative_scores: スコアから導かれるリスクまたは AUC の値を計算する。\<close>
+text \<open>スコアから導かれるリスクまたは AUC の値を計算する。\<close>
 lemma balanced_block_negative_scores:
   assumes subgroup_sign: "t = 1 \<or> t = -1"
   shows "negative_scores (balanced_block t k) w =
@@ -359,33 +359,33 @@ lemma balanced_block_negative_scores:
   apply simp
   done
 
-text \<open>positive_scores_append: スコアから導かれるリスクまたは AUC の値を計算する。\<close>
+text \<open>スコアから導かれるリスクまたは AUC の値を計算する。\<close>
 lemma positive_scores_append [simp]:
   "positive_scores (xs @ ys) w =
     positive_scores xs w @ positive_scores ys w"
   unfolding positive_scores_def by simp
 
-text \<open>negative_scores_append: スコアから導かれるリスクまたは AUC の値を計算する。\<close>
+text \<open>スコアから導かれるリスクまたは AUC の値を計算する。\<close>
 lemma negative_scores_append [simp]:
   "negative_scores (xs @ ys) w =
     negative_scores xs w @ negative_scores ys w"
   unfolding negative_scores_def by simp
 
-text \<open>balanced_test_pool_positive_scores: スコアから導かれるリスクまたは AUC の値を計算する。\<close>
+text \<open>スコアから導かれるリスクまたは AUC の値を計算する。\<close>
 lemma balanced_test_pool_positive_scores:
   "positive_scores (balanced_test_pool anchor_count tail_count) w =
     replicate anchor_count w @ replicate tail_count (-w)"
   unfolding balanced_test_pool_def
   by (simp add: balanced_block_positive_scores)
 
-text \<open>balanced_test_pool_negative_scores: スコアから導かれるリスクまたは AUC の値を計算する。\<close>
+text \<open>スコアから導かれるリスクまたは AUC の値を計算する。\<close>
 lemma balanced_test_pool_negative_scores:
   "negative_scores (balanced_test_pool anchor_count tail_count) w =
     replicate anchor_count (-w) @ replicate tail_count w"
   unfolding balanced_test_pool_def
   by (simp add: balanced_block_negative_scores)
 
-text \<open>empirical_auc_balanced_test_pool: スコアから導かれるリスクまたは AUC の値を計算する。\<close>
+text \<open>スコアから導かれるリスクまたは AUC の値を計算する。\<close>
 lemma empirical_auc_balanced_test_pool:
   assumes nonempty: "0 < anchor_count + tail_count"
   shows "empirical_auc (balanced_test_pool anchor_count tail_count) w =
@@ -425,7 +425,7 @@ proof -
     done
 qed
 
-text \<open>balanced_block_identities_distinct: 定義と後続の反転解析で用いる基本性質を示す。\<close>
+text \<open>定義と後続の反転解析で用いる基本性質を示す。\<close>
 lemma balanced_block_identities_distinct:
 
   "distinct (map example_identity (balanced_block t k))"
@@ -451,18 +451,18 @@ proof -
       positive_function negative_function
     using positive_distinct negative_distinct disjoint by simp
 qed
-text \<open>count_list_replicate_same: カリキュラムの個数または母集団分解を整理する。\<close>
+text \<open>カリキュラムの個数または母集団分解を整理する。\<close>
 
 lemma count_list_replicate_same [simp]:
   "count_list (replicate k x) x = k"
   by (induction k) simp_all
-text \<open>count_list_replicate_different: カリキュラムの個数または母集団分解を整理する。\<close>
+text \<open>カリキュラムの個数または母集団分解を整理する。\<close>
 
 lemma count_list_replicate_different [simp]:
   assumes different: "x \<noteq> y"
   shows "count_list (replicate k x) y = 0"
   using different by (induction k) simp_all
-text \<open>balanced_block_label_counts: カリキュラムの個数または母集団分解を整理する。\<close>
+text \<open>カリキュラムの個数または母集団分解を整理する。\<close>
 
 lemma balanced_block_label_counts:
   assumes subgroup_sign: "t = 1 \<or> t = -1"
@@ -470,7 +470,7 @@ lemma balanced_block_label_counts:
     and "count_list (map example_label (balanced_block t k)) (-1) = k"
   using subgroup_sign unfolding balanced_block_labels
   by auto
-text \<open>anchor_and_tail_blocks_balanced: 定義と後続の反転解析で用いる基本性質を示す。\<close>
+text \<open>定義と後続の反転解析で用いる基本性質を示す。\<close>
 
 lemma anchor_and_tail_blocks_balanced:
   shows "count_list (map example_label (balanced_block 1 k)) 1 = k \<and>
@@ -480,7 +480,7 @@ lemma anchor_and_tail_blocks_balanced:
   using balanced_block_label_counts[of 1 k]
     balanced_block_label_counts[of "-1" k] by auto
 
-text \<open>realizable_test_auc: 二座標の実現可能モデルにおけるテスト AUC を定める。\<close>
+text \<open>二座標の実現可能モデルにおけるテスト AUC を定める。\<close>
 
 definition realizable_test_auc ::
     "real \<Rightarrow> real \<Rightarrow> real \<Rightarrow> real" where
@@ -489,7 +489,7 @@ definition realizable_test_auc ::
     (1 - epsilon) * epsilon * auc_pair_credit (a + u) (a - u) +
     epsilon * (1 - epsilon) * auc_pair_credit (-a + u) (-a - u) +
     epsilon^2 * auc_pair_credit (-a + u) (a - u)"
-text \<open>realizable_test_auc_random: スコアから導かれるリスクまたは AUC の値を計算する。\<close>
+text \<open>スコアから導かれるリスクまたは AUC の値を計算する。\<close>
 
 lemma realizable_test_auc_random:
   assumes u_positive: "0 < u"
@@ -505,7 +505,7 @@ proof -
     using anchor_pair anchor_tail_pair tail_anchor_pair tail_pair
     by (simp add: power2_eq_square algebra_simps)
 qed
-text \<open>realizable_test_auc_attack: スコアから導かれるリスクまたは AUC の値を計算する。\<close>
+text \<open>スコアから導かれるリスクまたは AUC の値を計算する。\<close>
 
 lemma realizable_test_auc_attack:
   assumes u_positive: "0 < u"
@@ -523,46 +523,46 @@ proof -
     using anchor_pair anchor_tail_pair tail_anchor_pair tail_pair
     by (simp add: power2_eq_square algebra_simps)
 qed
-text \<open>curriculum_scale: カリキュラム段階の基本スケールを定める。\<close>
+text \<open>カリキュラム段階の基本スケールを定める。\<close>
 
 definition curriculum_scale :: "nat \<Rightarrow> nat" where
   "curriculum_scale k = 2 * (k + 2)"
-text \<open>curriculum_population: 基本スケールから全母集団サイズを定める。\<close>
+text \<open>基本スケールから全母集団サイズを定める。\<close>
 
 definition curriculum_population :: "nat \<Rightarrow> nat" where
   "curriculum_population k = curriculum_scale k ^ 6"
-text \<open>curriculum_tail_count: 基本スケールからテール個数を定める。\<close>
+text \<open>基本スケールからテール個数を定める。\<close>
 
 definition curriculum_tail_count :: "nat \<Rightarrow> nat" where
   "curriculum_tail_count k = curriculum_scale k ^ 5"
-text \<open>curriculum_anchor_count: 全母集団からテールを引いたアンカー個数を定める。\<close>
+text \<open>全母集団からテールを引いたアンカー個数を定める。\<close>
 
 definition curriculum_anchor_count :: "nat \<Rightarrow> nat" where
   "curriculum_anchor_count k =
     curriculum_population k - curriculum_tail_count k"
-text \<open>curriculum_learning_rate: 段階依存の学習率を定める。\<close>
+text \<open>段階依存の学習率を定める。\<close>
 
 definition curriculum_learning_rate :: "nat \<Rightarrow> real" where
   "curriculum_learning_rate k = 1 / real (curriculum_scale k) ^ 4"
-text \<open>curriculum_confidence: ランダム順序評価に用いる信頼度誤差を定める。\<close>
+text \<open>ランダム順序評価に用いる信頼度誤差を定める。\<close>
 
 definition curriculum_confidence :: "nat \<Rightarrow> real" where
   "curriculum_confidence k = 1 / real (curriculum_scale k) ^ 12"
-text \<open>curriculum_realizable_scale: 実現可能モデルの二座標スケールを定める。\<close>
+text \<open>実現可能モデルの二座標スケールを定める。\<close>
 
 definition curriculum_realizable_scale :: "nat \<Rightarrow> real" where
   "curriculum_realizable_scale k = 1 / real (curriculum_scale k) ^ 3"
-text \<open>curriculum_tail_ratio: テール個数の母集団比率を定める。\<close>
+text \<open>テール個数の母集団比率を定める。\<close>
 
 definition curriculum_tail_ratio :: "nat \<Rightarrow> real" where
   "curriculum_tail_ratio k =
     real (curriculum_tail_count k) / real (curriculum_population k)"
-text \<open>curriculum_scale_at_least_four: 対象量の下界を示す。\<close>
+text \<open>対象量の下界を示す。\<close>
 
 lemma curriculum_scale_at_least_four:
   "4 \<le> curriculum_scale k"
   unfolding curriculum_scale_def by simp
-text \<open>curriculum_counts: カリキュラムの個数または母集団分解を整理する。\<close>
+text \<open>カリキュラムの個数または母集団分解を整理する。\<close>
 
 lemma curriculum_counts:
   "curriculum_tail_count k + curriculum_anchor_count k =
@@ -583,12 +583,12 @@ proof -
   show ?thesis
     unfolding curriculum_anchor_count_def using tail_le_population by simp
 qed
-text \<open>curriculum_tail_positive: 対象量が正であること、または正側の評価を示す。\<close>
+text \<open>対象量が正であること、または正側の評価を示す。\<close>
 
 lemma curriculum_tail_positive:
   "0 < curriculum_tail_count k"
   unfolding curriculum_tail_count_def curriculum_scale_def by simp
-text \<open>curriculum_tail_smaller: 定義と後続の反転解析で用いる基本性質を示す。\<close>
+text \<open>定義と後続の反転解析で用いる基本性質を示す。\<close>
 
 lemma curriculum_tail_smaller:
   "curriculum_tail_count k < curriculum_anchor_count k"
@@ -608,7 +608,7 @@ proof -
       curriculum_population_def
     using twice_tail_less_population by linarith
 qed
-text \<open>curriculum_counts_even: カリキュラムの個数または母集団分解を整理する。\<close>
+text \<open>カリキュラムの個数または母集団分解を整理する。\<close>
 
 lemma curriculum_counts_even:
   "even (curriculum_tail_count k) \<and>
@@ -616,7 +616,7 @@ lemma curriculum_counts_even:
   unfolding curriculum_tail_count_def curriculum_anchor_count_def
     curriculum_population_def curriculum_scale_def
   by simp
-text \<open>curriculum_tail_ratio_exact: アンカーとテールの比率に関する恒等式または境界を示す。\<close>
+text \<open>アンカーとテールの比率に関する恒等式または境界を示す。\<close>
 
 lemma curriculum_tail_ratio_exact:
   "curriculum_tail_ratio k = 1 / real (curriculum_scale k)"
@@ -648,7 +648,7 @@ proof -
       curriculum_population_def
     by (rule divide_eq_imp[OF denominator_nonzero product_cancel[symmetric]])
 qed
-text \<open>curriculum_tail_ratio_tendsto_zero: 対応する量が段階極限で 0 へ収束することを示す。\<close>
+text \<open>対応する量が段階極限で 0 へ収束することを示す。\<close>
 
 lemma curriculum_tail_ratio_tendsto_zero:
   "((\<lambda>k. curriculum_tail_ratio k) \<longlongrightarrow> 0) sequentially"
@@ -673,7 +673,7 @@ proof -
     by (simp add: curriculum_tail_ratio_exact
           field_class.field_divide_inverse)
 qed
-text \<open>sigmoid_neg_identity: 定義と後続の反転解析で用いる基本性質を示す。\<close>
+text \<open>定義と後続の反転解析で用いる基本性質を示す。\<close>
 
 lemma sigmoid_neg_identity:
   "sigmoid (-x) = 1 - sigmoid x"
@@ -728,7 +728,7 @@ proof -
     using reciprocal_ratio reciprocal_difference
     by (simp add: exp_minus)
 qed
-text \<open>sigmoid_lipschitz: 定義と後続の反転解析で用いる基本性質を示す。\<close>
+text \<open>定義と後続の反転解析で用いる基本性質を示す。\<close>
 
 lemma sigmoid_lipschitz:
   "abs (sigmoid x - sigmoid y) \<le> abs (x - y) / 4"
@@ -750,7 +750,7 @@ next
   show ?thesis using yx sigmoid_order upper
     by simp
 qed
-text \<open>mean_logistic_step_nonexpansive: 対数またはロジット比をスケール量に結び付ける。\<close>
+text \<open>対数またはロジット比をスケール量に結び付ける。\<close>
 
 lemma mean_logistic_step_nonexpansive:
   fixes eta q x y :: real
@@ -770,25 +770,25 @@ next
     eta_at_most_four yx, of q]
   show ?thesis using yx bounds by simp
 qed
-text \<open>signed_bool: ブール値を符号付き実数へ写像する。\<close>
+text \<open>ブール値を符号付き実数へ写像する。\<close>
 
 definition signed_bool :: "bool \<Rightarrow> real" where
   "signed_bool b = (if b then 1 else -1)"
-text \<open>realizable_feature: 信号とブール属性から二座標特徴を構成する。\<close>
+text \<open>信号とブール属性から二座標特徴を構成する。\<close>
 
 definition realizable_feature :: "real \<Rightarrow> real \<Rightarrow> bool \<Rightarrow> real \<times> real" where
   "realizable_feature kappa s b =
     (s, kappa * s * signed_bool b)"
-text \<open>realizable_score: 二座標重みと特徴の線形スコアを定める。\<close>
+text \<open>二座標重みと特徴の線形スコアを定める。\<close>
 
 definition realizable_score :: "(real \<times> real) \<Rightarrow> (real \<times> real) \<Rightarrow> real" where
   "realizable_score theta x = fst theta * fst x + snd theta * snd x"
-text \<open>signed_bool_square: 定義と後続の反転解析で用いる基本性質を示す。\<close>
+text \<open>定義と後続の反転解析で用いる基本性質を示す。\<close>
 
 lemma signed_bool_square [simp]:
   "signed_bool b ^ 2 = 1"
   unfolding signed_bool_def by (cases b) simp_all
-text \<open>realizable_score_witness: スコアから導かれるリスクまたは AUC の値を計算する。\<close>
+text \<open>スコアから導かれるリスクまたは AUC の値を計算する。\<close>
 
 lemma realizable_score_witness:
   assumes kappa_nonzero: "kappa \<noteq> 0"
@@ -796,7 +796,7 @@ lemma realizable_score_witness:
     clean_label s (signed_bool b)"
   unfolding realizable_score_def realizable_feature_def clean_label_def
   using kappa_nonzero by simp
-text \<open>realizable_signed_margin: 更新後の分類マージンを評価する。\<close>
+text \<open>更新後の分類マージンを評価する。\<close>
 
 lemma realizable_signed_margin:
   assumes signal_sign: "s = 1 \<or> s = -1"
@@ -817,25 +817,25 @@ primrec realizable_logistic_state ::
          response = sigmoid (-(t * fst state + snd state))
      in (fst state + eta * t * response,
          snd state + eta * kappa^2 * response))"
-text \<open>realizable_a_state: 実現可能更新の主座標を取り出す。\<close>
+text \<open>実現可能更新の主座標を取り出す。\<close>
 
 definition realizable_a_state ::
     "real \<Rightarrow> real \<Rightarrow> bool list \<Rightarrow> nat \<Rightarrow> real" where
   "realizable_a_state eta kappa xs k =
     fst (realizable_logistic_state eta kappa xs k)"
-text \<open>realizable_u_state: 実現可能更新の補助座標を取り出す。\<close>
+text \<open>実現可能更新の補助座標を取り出す。\<close>
 
 definition realizable_u_state ::
     "real \<Rightarrow> real \<Rightarrow> bool list \<Rightarrow> nat \<Rightarrow> real" where
   "realizable_u_state eta kappa xs k =
     snd (realizable_logistic_state eta kappa xs k)"
-text \<open>realizable_states_zero: 状態更新の初期値、再帰式、または明示式を示す。\<close>
+text \<open>状態更新の初期値、再帰式、または明示式を示す。\<close>
 
 lemma realizable_states_zero [simp]:
   "realizable_a_state eta kappa xs 0 = 0 \<and>
     realizable_u_state eta kappa xs 0 = 0"
   unfolding realizable_a_state_def realizable_u_state_def by simp
-text \<open>realizable_a_state_Suc: 状態更新の初期値、再帰式、または明示式を示す。\<close>
+text \<open>状態更新の初期値、再帰式、または明示式を示す。\<close>
 
 lemma realizable_a_state_Suc:
   "realizable_a_state eta kappa xs (Suc k) =
@@ -846,7 +846,7 @@ lemma realizable_a_state_Suc:
           realizable_u_state eta kappa xs k))"
   unfolding realizable_a_state_def realizable_u_state_def
   by (simp only: realizable_logistic_state.simps Let_def fst_conv snd_conv)
-text \<open>realizable_u_state_Suc: 状態更新の初期値、再帰式、または明示式を示す。\<close>
+text \<open>状態更新の初期値、再帰式、または明示式を示す。\<close>
 
 lemma realizable_u_state_Suc:
   "realizable_u_state eta kappa xs (Suc k) =
@@ -857,7 +857,7 @@ lemma realizable_u_state_Suc:
           realizable_u_state eta kappa xs k))"
   unfolding realizable_a_state_def realizable_u_state_def
   by (simp only: realizable_logistic_state.simps Let_def fst_conv snd_conv)
-text \<open>realizable_u_state_bounds: 状態更新の初期値、再帰式、または明示式を示す。\<close>
+text \<open>状態更新の初期値、再帰式、または明示式を示す。\<close>
 
 lemma realizable_u_state_bounds:
   assumes eta_nonnegative: "0 \<le> eta"
@@ -900,14 +900,14 @@ next
     using next_upper bound_identity by linarith
   show ?case using lower upper by blast
 qed
-text \<open>signed_bool_logistic_increment: 対数またはロジット比をスケール量に結び付ける。\<close>
+text \<open>対数またはロジット比をスケール量に結び付ける。\<close>
 
 lemma signed_bool_logistic_increment:
   "signed_bool b * sigmoid (-(signed_bool b * a)) =
     bool_value b - sigmoid a"
   by (cases b)
     (simp_all add: signed_bool_def bool_value_def sigmoid_neg_identity)
-text \<open>realizable_increment_difference_bound: 誤差または状態の明示的な上界を与える。\<close>
+text \<open>誤差または状態の明示的な上界を与える。\<close>
 
 lemma realizable_increment_difference_bound:
   "abs (signed_bool b * sigmoid (-(signed_bool b * a + u)) -
@@ -923,7 +923,7 @@ next
   show ?thesis using bound False
     by (simp add: signed_bool_def bool_value_def)
 qed
-text \<open>realizable_a_comparison: 理想更新と摂動付き更新の差を評価し、性質を移送する。\<close>
+text \<open>理想更新と摂動付き更新の差を評価し、性質を移送する。\<close>
 
 lemma realizable_a_comparison:
   fixes eta kappa q :: real
@@ -1005,17 +1005,17 @@ next
     by (simp add: power2_eq_square field_simps; algebra)
   show ?case using preliminary bound_identity by linarith
 qed
-text \<open>realizable_transfer_error: 実現可能更新と理想更新の移送誤差を定める。\<close>
+text \<open>実現可能更新と理想更新の移送誤差を定める。\<close>
 
 definition realizable_transfer_error :: "real \<Rightarrow> real \<Rightarrow> nat \<Rightarrow> real" where
   "realizable_transfer_error eta kappa N =
     kappa^2 * (eta * real N +
       eta^2 * real N * (real N - 1) / 8)"
-text \<open>signed_bool_abs: 定義と後続の反転解析で用いる基本性質を示す。\<close>
+text \<open>定義と後続の反転解析で用いる基本性質を示す。\<close>
 
 lemma signed_bool_abs [simp]: "abs (signed_bool b) = 1"
   unfolding signed_bool_def by (cases b) simp_all
-text \<open>realizable_u_state_positive: 対象量が正であること、または正側の評価を示す。\<close>
+text \<open>対象量が正であること、または正側の評価を示す。\<close>
 
 lemma realizable_u_state_positive:
   assumes eta_positive: "0 < eta"
@@ -1047,7 +1047,7 @@ proof -
     unfolding N realizable_u_state_Suc
     using previous_nonnegative increment_positive by linarith
 qed
-text \<open>realizable_margin_comparison: 理想更新と摂動付き更新の差を評価し、性質を移送する。\<close>
+text \<open>理想更新と摂動付き更新の差を評価し、性質を移送する。\<close>
 
 lemma realizable_margin_comparison:
   fixes eta kappa q :: real
@@ -1089,7 +1089,7 @@ proof -
     by (simp add: power2_eq_square field_simps; algebra)
   show ?thesis using combined error_identity by linarith
 qed
-text \<open>realizable_positive_dominance_transfer: 理想更新と摂動付き更新の差を評価し、性質を移送する。\<close>
+text \<open>理想更新と摂動付き更新の差を評価し、性質を移送する。\<close>
 
 lemma realizable_positive_dominance_transfer:
   fixes eta kappa q G :: real
@@ -1116,7 +1116,7 @@ proof -
     using comparison abs_ge_self by linarith
   show ?thesis using self_upper reference_margin error_small by linarith
 qed
-text \<open>realizable_negative_dominance_transfer: 理想更新と摂動付き更新の差を評価し、性質を移送する。\<close>
+text \<open>理想更新と摂動付き更新の差を評価し、性質を移送する。\<close>
 
 lemma realizable_negative_dominance_transfer:
   fixes eta kappa q G :: real
@@ -1143,27 +1143,27 @@ proof -
     using comparison abs_ge_self by linarith
   show ?thesis using self_upper reference_margin error_small by linarith
 qed
-text \<open>realizable_test_risk: 二座標実現可能モデルのテストリスクを定める。\<close>
+text \<open>二座標実現可能モデルのテストリスクを定める。\<close>
 
 definition realizable_test_risk :: "real \<Rightarrow> real \<Rightarrow> real \<Rightarrow> real" where
   "realizable_test_risk epsilon a u =
     (1 - epsilon) * zero_one_margin_loss (a + u) +
       epsilon * zero_one_margin_loss (-a + u)"
-text \<open>realizable_test_risk_positive: 対象量が正であること、または正側の評価を示す。\<close>
+text \<open>対象量が正であること、または正側の評価を示す。\<close>
 
 lemma realizable_test_risk_positive:
   assumes u_positive: "0 < u" and dominant_positive: "u < a"
   shows "realizable_test_risk epsilon a u = epsilon"
   unfolding realizable_test_risk_def zero_one_margin_loss_def
   using u_positive dominant_positive by simp
-text \<open>realizable_test_risk_negative: 対象量が負であること、または負側の評価を示す。\<close>
+text \<open>対象量が負であること、または負側の評価を示す。\<close>
 
 lemma realizable_test_risk_negative:
   assumes u_positive: "0 < u" and dominant_negative: "a < -u"
   shows "realizable_test_risk epsilon a u = 1 - epsilon"
   unfolding realizable_test_risk_def zero_one_margin_loss_def
   using u_positive dominant_negative by simp
-text \<open>realizable_inversion_transfer: 攻撃順序と正常順序の間で学習挙動が反転することを示す。\<close>
+text \<open>攻撃順序と正常順序の間で学習挙動が反転することを示す。\<close>
 
 theorem realizable_inversion_transfer:
   fixes eta kappa q G_attack G_random epsilon :: real
@@ -1239,7 +1239,7 @@ proof -
     by (rule realizable_test_auc_random[OF random_u_positive random_dominance])
   show ?thesis using attack_risk random_risk attack_auc random_auc by blast
 qed
-text \<open>realizable_random_metric_transfer: 理想更新と摂動付き更新の差を評価し、性質を移送する。\<close>
+text \<open>理想更新と摂動付き更新の差を評価し、性質を移送する。\<close>
 
 theorem realizable_random_metric_transfer:
   fixes eta kappa q epsilon :: real
@@ -1282,30 +1282,30 @@ primrec momentum_logistic_state ::
          gradient = sigmoid (fst state) - bool_value (xs ! k);
          velocity = mu * snd state + gradient
      in (fst state - eta * velocity, velocity))"
-text \<open>momentum_w_state: モメンタム更新の重み座標を取り出す。\<close>
+text \<open>モメンタム更新の重み座標を取り出す。\<close>
 
 definition momentum_w_state ::
     "real \<Rightarrow> real \<Rightarrow> bool list \<Rightarrow> nat \<Rightarrow> real" where
   "momentum_w_state eta mu xs k =
     fst (momentum_logistic_state eta mu xs k)"
-text \<open>momentum_v_state: モメンタム更新の速度座標を取り出す。\<close>
+text \<open>モメンタム更新の速度座標を取り出す。\<close>
 
 definition momentum_v_state ::
     "real \<Rightarrow> real \<Rightarrow> bool list \<Rightarrow> nat \<Rightarrow> real" where
   "momentum_v_state eta mu xs k =
     snd (momentum_logistic_state eta mu xs k)"
-text \<open>momentum_effective_step: モメンタムを含む有効学習ステップを定める。\<close>
+text \<open>モメンタムを含む有効学習ステップを定める。\<close>
 
 definition momentum_effective_step :: "real \<Rightarrow> real \<Rightarrow> real" where
   "momentum_effective_step eta mu = eta / (1 - mu)"
-text \<open>momentum_z_state: モメンタム状態を有効更新との差として定める。\<close>
+text \<open>モメンタム状態を有効更新との差として定める。\<close>
 
 definition momentum_z_state ::
     "real \<Rightarrow> real \<Rightarrow> bool list \<Rightarrow> nat \<Rightarrow> real" where
   "momentum_z_state eta mu xs k =
     momentum_w_state eta mu xs k -
       momentum_effective_step eta mu * mu * momentum_v_state eta mu xs k"
-text \<open>momentum_states_zero: 状態更新の初期値、再帰式、または明示式を示す。\<close>
+text \<open>状態更新の初期値、再帰式、または明示式を示す。\<close>
 
 lemma momentum_states_zero [simp]:
   "momentum_w_state eta mu xs 0 = 0 \<and>
@@ -1313,7 +1313,7 @@ lemma momentum_states_zero [simp]:
     momentum_z_state eta mu xs 0 = 0"
   unfolding momentum_w_state_def momentum_v_state_def momentum_z_state_def
   by simp
-text \<open>momentum_v_state_Suc: 状態更新の初期値、再帰式、または明示式を示す。\<close>
+text \<open>状態更新の初期値、再帰式、または明示式を示す。\<close>
 
 lemma momentum_v_state_Suc:
   "momentum_v_state eta mu xs (Suc k) =
@@ -1321,7 +1321,7 @@ lemma momentum_v_state_Suc:
       (sigmoid (momentum_w_state eta mu xs k) - bool_value (xs ! k))"
   unfolding momentum_v_state_def momentum_w_state_def
   by (simp only: momentum_logistic_state.simps Let_def fst_conv snd_conv)
-text \<open>momentum_w_state_Suc: 状態更新の初期値、再帰式、または明示式を示す。\<close>
+text \<open>状態更新の初期値、再帰式、または明示式を示す。\<close>
 
 lemma momentum_w_state_Suc:
   "momentum_w_state eta mu xs (Suc k) =
@@ -1330,7 +1330,7 @@ lemma momentum_w_state_Suc:
         (sigmoid (momentum_w_state eta mu xs k) - bool_value (xs ! k)))"
   unfolding momentum_v_state_def momentum_w_state_def
   by (simp only: momentum_logistic_state.simps Let_def fst_conv snd_conv)
-text \<open>momentum_z_state_Suc: 状態更新の初期値、再帰式、または明示式を示す。\<close>
+text \<open>状態更新の初期値、再帰式、または明示式を示す。\<close>
 
 lemma momentum_z_state_Suc:
   assumes mu_not_one: "mu \<noteq> 1"
@@ -1384,7 +1384,7 @@ proof -
     unfolding momentum_z_state_def momentum_w_state_Suc momentum_v_state_Suc
     using transformed rhs_identity by simp
 qed
-text \<open>binary_logistic_gradient_abs_le_one: 対数またはロジット比をスケール量に結び付ける。\<close>
+text \<open>対数またはロジット比をスケール量に結び付ける。\<close>
 
 lemma binary_logistic_gradient_abs_le_one:
   "abs (sigmoid w - bool_value b) \<le> 1"
@@ -1426,7 +1426,7 @@ next
     using absolute sigmoid_positive by linarith
   show ?thesis using True target by simp
 qed
-text \<open>momentum_velocity_bound: 誤差または状態の明示的な上界を与える。\<close>
+text \<open>誤差または状態の明示的な上界を与える。\<close>
 
 lemma momentum_velocity_bound:
   assumes mu_nonnegative: "0 \<le> mu"
@@ -1464,11 +1464,11 @@ next
     unfolding momentum_v_state_Suc
     using step_bound gradient_bound scaled_induction fixed_point by linarith
 qed
-text \<open>momentum_transform_error: モメンタム変換に伴う一段誤差を定める。\<close>
+text \<open>モメンタム変換に伴う一段誤差を定める。\<close>
 
 definition momentum_transform_error :: "real \<Rightarrow> real \<Rightarrow> real" where
   "momentum_transform_error eta mu = eta * mu / (1 - mu)^2"
-text \<open>momentum_transform_error_nonnegative: 誤差または状態の明示的な上界を与える。\<close>
+text \<open>誤差または状態の明示的な上界を与える。\<close>
 
 lemma momentum_transform_error_nonnegative:
   assumes eta_nonnegative: "0 \<le> eta"
@@ -1483,7 +1483,7 @@ proof -
     unfolding momentum_transform_error_def
     using numerator_nonnegative denominator_positive by simp
 qed
-text \<open>momentum_transform_gap_bound: 誤差または状態の明示的な上界を与える。\<close>
+text \<open>誤差または状態の明示的な上界を与える。\<close>
 
 lemma momentum_transform_gap_bound:
   assumes eta_nonnegative: "0 \<le> eta"
@@ -1545,7 +1545,7 @@ proof -
     by (rule coefficient_identity)
   finally show ?thesis .
 qed
-text \<open>momentum_z_comparison: 理想更新と摂動付き更新の差を評価し、性質を移送する。\<close>
+text \<open>理想更新と摂動付き更新の差を評価し、性質を移送する。\<close>
 
 lemma momentum_z_comparison:
   assumes eta_nonnegative: "0 \<le> eta"
@@ -1651,13 +1651,13 @@ next
     by (simp; algebra)
   show ?case using step_bound Suc.IH arithmetic_identity by linarith
 qed
-text \<open>momentum_transfer_error: モメンタム更新を理想更新へ移送する誤差予算を定める。\<close>
+text \<open>モメンタム更新を理想更新へ移送する誤差予算を定める。\<close>
 
 definition momentum_transfer_error :: "real \<Rightarrow> real \<Rightarrow> nat \<Rightarrow> real" where
   "momentum_transfer_error eta mu N =
     momentum_transform_error eta mu *
       (1 + real N * momentum_effective_step eta mu / 4)"
-text \<open>momentum_state_comparison: 理想更新と摂動付き更新の差を評価し、性質を移送する。\<close>
+text \<open>理想更新と摂動付き更新の差を評価し、性質を移送する。\<close>
 
 lemma momentum_state_comparison:
   assumes eta_nonnegative: "0 \<le> eta"
@@ -1705,7 +1705,7 @@ proof -
     unfolding momentum_transfer_error_def by algebra
   show ?thesis using combined error_identity by linarith
 qed
-text \<open>momentum_positive_margin_transfer: 理想更新と摂動付き更新の差を評価し、性質を移送する。\<close>
+text \<open>理想更新と摂動付き更新の差を評価し、性質を移送する。\<close>
 
 lemma momentum_positive_margin_transfer:
   assumes eta_nonnegative: "0 \<le> eta"
@@ -1728,7 +1728,7 @@ proof -
     using comparison abs_ge_minus_self[of "?w - ?reference"] by linarith
   show ?thesis using reverse_difference reference_margin error_small by linarith
 qed
-text \<open>momentum_negative_margin_transfer: 理想更新と摂動付き更新の差を評価し、性質を移送する。\<close>
+text \<open>理想更新と摂動付き更新の差を評価し、性質を移送する。\<close>
 
 lemma momentum_negative_margin_transfer:
   assumes eta_nonnegative: "0 \<le> eta"
@@ -1751,7 +1751,7 @@ proof -
     using comparison abs_ge_self[of "?w - ?reference"] by linarith
   show ?thesis using forward_difference reference_margin error_small by linarith
 qed
-text \<open>momentum_zero_reference_exact: 対象量の厳密な閉形式を示す。\<close>
+text \<open>対象量の厳密な閉形式を示す。\<close>
 
 lemma momentum_zero_reference_exact:
   assumes eta_nonnegative: "0 \<le> eta" and eta_at_most_four: "eta \<le> 4"
@@ -1774,7 +1774,7 @@ proof -
       momentum_transform_error_def
     by simp
 qed
-text \<open>momentum_inversion_transfer: 攻撃順序と正常順序の間で学習挙動が反転することを示す。\<close>
+text \<open>攻撃順序と正常順序の間で学習挙動が反転することを示す。\<close>
 
 theorem momentum_inversion_transfer:
   fixes eta mu q G_attack G_random epsilon :: real
@@ -1821,22 +1821,22 @@ proof -
     by (rule clean_test_auc_positive[OF random_positive])
   show ?thesis using attack_risk random_risk attack_auc random_auc by blast
 qed
-text \<open>additive_iteration: 加法的摂動を含む反復更新を定める。\<close>
+text \<open>加法的摂動を含む反復更新を定める。\<close>
 
 definition additive_iteration ::
     "(real \<Rightarrow> real) \<Rightarrow> (nat \<Rightarrow> real) \<Rightarrow> real \<Rightarrow> nat \<Rightarrow> real" where
   "additive_iteration F e x k = perturbed_iteration F 1 e x k"
-text \<open>additive_iteration_zero: アンカーとテールの比率に関する恒等式または境界を示す。\<close>
+text \<open>アンカーとテールの比率に関する恒等式または境界を示す。\<close>
 
 lemma additive_iteration_zero [simp]:
   "additive_iteration F e x 0 = x"
   unfolding additive_iteration_def by simp
-text \<open>additive_iteration_Suc: アンカーとテールの比率に関する恒等式または境界を示す。\<close>
+text \<open>アンカーとテールの比率に関する恒等式または境界を示す。\<close>
 
 lemma additive_iteration_Suc:
   "additive_iteration F e x (Suc k) = F (additive_iteration F e x k) + e k"
   unfolding additive_iteration_def by simp
-text \<open>additive_iteration_error_bound: アンカーとテールの比率に関する恒等式または境界を示す。\<close>
+text \<open>アンカーとテールの比率に関する恒等式または境界を示す。\<close>
 
 lemma additive_iteration_error_bound:
   assumes nonexpansive: "\<And>a b. abs (F a - F b) \<le> abs (a - b)"
@@ -1880,12 +1880,12 @@ next
     by simp
   show ?case using step_bound Suc.IH sum_identity by linarith
 qed
-text \<open>additive_perturbation_budget: 加法的摂動と初期ずれの総予算を定める。\<close>
+text \<open>加法的摂動と初期ずれの総予算を定める。\<close>
 
 definition additive_perturbation_budget ::
     "(nat \<Rightarrow> real) \<Rightarrow> real \<Rightarrow> nat \<Rightarrow> real" where
   "additive_perturbation_budget e rho N = (\<Sum>i<N. abs (e i)) + abs rho"
-text \<open>additive_positive_margin_transfer: 理想更新と摂動付き更新の差を評価し、性質を移送する。\<close>
+text \<open>理想更新と摂動付き更新の差を評価し、性質を移送する。\<close>
 
 lemma additive_positive_margin_transfer:
   assumes nonexpansive: "\<And>a b. abs (F a - F b) \<le> abs (a - b)"
@@ -1906,7 +1906,7 @@ proof -
     using budget_small unfolding additive_perturbation_budget_def by simp
   show ?thesis using reverse_difference residual_lower reference_margin budget by linarith
 qed
-text \<open>additive_negative_margin_transfer: 理想更新と摂動付き更新の差を評価し、性質を移送する。\<close>
+text \<open>理想更新と摂動付き更新の差を評価し、性質を移送する。\<close>
 
 lemma additive_negative_margin_transfer:
   assumes nonexpansive: "\<And>a b. abs (F a - F b) \<le> abs (a - b)"
@@ -1927,7 +1927,7 @@ proof -
     using budget_small unfolding additive_perturbation_budget_def by simp
   show ?thesis using forward_difference residual_upper reference_margin budget by linarith
 qed
-text \<open>additive_perturbation_inversion_transfer: 攻撃順序と正常順序の間で学習挙動が反転することを示す。\<close>
+text \<open>攻撃順序と正常順序の間で学習挙動が反転することを示す。\<close>
 
 theorem additive_perturbation_inversion_transfer:
   assumes nonexpansive: "\<And>a b. abs (F a - F b) \<le> abs (a - b)"
@@ -1950,7 +1950,7 @@ proof -
           random_budget])
   show ?thesis using attack_negative random_positive by blast
 qed
-text \<open>curriculum_realizable_transfer_error_exact: 理想更新と摂動付き更新の差を評価し、性質を移送する。\<close>
+text \<open>理想更新と摂動付き更新の差を評価し、性質を移送する。\<close>
 
 lemma curriculum_realizable_transfer_error_exact:
   "realizable_transfer_error (curriculum_learning_rate k)
@@ -1967,7 +1967,7 @@ proof -
     using scale_nonzero
     by (simp add: power2_eq_square field_simps; algebra)
 qed
-text \<open>curriculum_momentum_transfer_error_exact: 理想更新と摂動付き更新の差を評価し、性質を移送する。\<close>
+text \<open>理想更新と摂動付き更新の差を評価し、性質を移送する。\<close>
 
 lemma curriculum_momentum_transfer_error_exact:
   "momentum_transfer_error (curriculum_learning_rate k) (1 / 2)
@@ -1984,7 +1984,7 @@ proof -
     using scale_nonzero
     by (simp add: power2_eq_square field_simps; algebra)
 qed
-text \<open>curriculum_realizable_transfer_error_tendsto_zero: 対応する量が段階極限で 0 へ収束することを示す。\<close>
+text \<open>対応する量が段階極限で 0 へ収束することを示す。\<close>
 
 lemma curriculum_realizable_transfer_error_tendsto_zero:
   "((\<lambda>k. realizable_transfer_error (curriculum_learning_rate k)
@@ -2020,7 +2020,7 @@ proof -
     using total_limit
     by (simp add: curriculum_realizable_transfer_error_exact)
 qed
-text \<open>curriculum_momentum_transfer_error_tendsto_zero: 対応する量が段階極限で 0 へ収束することを示す。\<close>
+text \<open>対応する量が段階極限で 0 へ収束することを示す。\<close>
 
 lemma curriculum_momentum_transfer_error_tendsto_zero:
   "((\<lambda>k. momentum_transfer_error (curriculum_learning_rate k) (1 / 2)
@@ -2047,7 +2047,7 @@ proof -
     using total_limit
     by (simp add: curriculum_momentum_transfer_error_exact)
 qed
-text \<open>curriculum_realizable_transfer_error_eventually_small: 十分大きな段階で成立する評価を示す。\<close>
+text \<open>十分大きな段階で成立する評価を示す。\<close>
 
 lemma curriculum_realizable_transfer_error_eventually_small:
   assumes "0 < G"
@@ -2059,7 +2059,7 @@ proof -
     [OF curriculum_realizable_transfer_error_tendsto_zero, of G]
   show ?thesis using eventual_upper assms by simp
 qed
-text \<open>curriculum_momentum_transfer_error_eventually_small: 十分大きな段階で成立する評価を示す。\<close>
+text \<open>十分大きな段階で成立する評価を示す。\<close>
 
 lemma curriculum_momentum_transfer_error_eventually_small:
   assumes "0 < G"
@@ -2071,11 +2071,11 @@ proof -
     [OF curriculum_momentum_transfer_error_tendsto_zero, of G]
   show ?thesis using eventual_upper assms by simp
 qed
-text \<open>attack_order: アンカーを真、テールを偽に並べる攻撃順序を定める。\<close>
+text \<open>アンカーを真、テールを偽に並べる攻撃順序を定める。\<close>
 
 definition attack_order :: "nat \<Rightarrow> nat \<Rightarrow> bool list" where
   "attack_order n m = replicate n True @ replicate m False"
-text \<open>binary_logistic_state_true_prefix: 対数またはロジット比をスケール量に結び付ける。\<close>
+text \<open>対数またはロジット比をスケール量に結び付ける。\<close>
 
 lemma binary_logistic_state_true_prefix:
   assumes prefix: "\<And>i. i < k \<Longrightarrow> xs ! i = True"
@@ -2099,7 +2099,7 @@ next
     by (simp add: binary_logistic_state_Suc anchor_state_def
         funpow_Suc_right anchor_step_def bool_value_def sigmoid_neg_identity)
 qed
-text \<open>binary_logistic_state_false_suffix: 対数またはロジット比をスケール量に結び付ける。\<close>
+text \<open>対数またはロジット比をスケール量に結び付ける。\<close>
 
 lemma binary_logistic_state_false_suffix:
   assumes start: "binary_logistic_state eta q xs n = w"
@@ -2129,7 +2129,7 @@ next
         tail_step_def)
     done
 qed
-text \<open>binary_logistic_state_attack_order: 対数またはロジット比をスケール量に結び付ける。\<close>
+text \<open>対数またはロジット比をスケール量に結び付ける。\<close>
 
 lemma binary_logistic_state_attack_order:
   "binary_logistic_state eta q (attack_order n m) (n + m) =
@@ -2169,7 +2169,7 @@ proof -
     unfolding attack_state_def
     by (rule binary_logistic_state_false_suffix[OF start suffix])
 qed
-text \<open>finite_pool_order_only_inversion: 攻撃順序と正常順序の間で学習挙動が反転することを示す。\<close>
+text \<open>攻撃順序と正常順序の間で学習挙動が反転することを示す。\<close>
 
 theorem finite_pool_order_only_inversion:
   fixes eta gamma delta epsilon :: real
@@ -2274,7 +2274,7 @@ proof -
   show "1 - delta \<le> uniform_probability (binary_orders n N) ?conclusion"
     using random_positive_probability event_probability_mono by linarith
 qed
-text \<open>curriculum_scale_filterlim: 対応する量が段階極限で 0 へ収束することを示す。\<close>
+text \<open>対応する量が段階極限で 0 へ収束することを示す。\<close>
 
 lemma curriculum_scale_filterlim:
   "filterlim (\<lambda>k. real (curriculum_scale k)) at_top sequentially"
@@ -2290,13 +2290,13 @@ proof -
     unfolding curriculum_scale_def
     using scaled by (simp add: algebra_simps)
 qed
-text \<open>curriculum_learning_rate_positive: 対象量が正であること、または正側の評価を示す。\<close>
+text \<open>対象量が正であること、または正側の評価を示す。\<close>
 
 lemma curriculum_learning_rate_positive:
   "0 < curriculum_learning_rate k"
   unfolding curriculum_learning_rate_def
   using curriculum_scale_at_least_four[of k] by simp
-text \<open>curriculum_learning_rate_at_most_four: 対象量の上界を示す。\<close>
+text \<open>対象量の上界を示す。\<close>
 
 lemma curriculum_learning_rate_at_most_four:
   "curriculum_learning_rate k \<le> 4"
@@ -2308,13 +2308,13 @@ proof -
     by (rule frac_le) (use denominator_at_least_one in simp_all)
   then show ?thesis unfolding curriculum_learning_rate_def by linarith
 qed
-text \<open>curriculum_population_positive: 対象量が正であること、または正側の評価を示す。\<close>
+text \<open>対象量が正であること、または正側の評価を示す。\<close>
 
 lemma curriculum_population_positive:
   "0 < curriculum_population k"
   unfolding curriculum_population_def
   using curriculum_scale_at_least_four[of k] by simp
-text \<open>curriculum_anchor_tail_ratio_exact: アンカーとテールの比率に関する恒等式または境界を示す。\<close>
+text \<open>アンカーとテールの比率に関する恒等式または境界を示す。\<close>
 
 lemma curriculum_anchor_tail_ratio_exact:
   "real (curriculum_anchor_count k) / real (curriculum_tail_count k) =
@@ -2344,7 +2344,7 @@ proof -
       curriculum_tail_count_def
     using cast_difference quotient_identity by simp
 qed
-text \<open>curriculum_effective_tail_mass: 定義と後続の反転解析で用いる基本性質を示す。\<close>
+text \<open>定義と後続の反転解析で用いる基本性質を示す。\<close>
 
 lemma curriculum_effective_tail_mass:
   "curriculum_learning_rate k * real (curriculum_tail_count k) =
@@ -2356,14 +2356,14 @@ proof -
     unfolding curriculum_learning_rate_def curriculum_tail_count_def
     using scale_nonzero by (simp add: field_simps; algebra)
 qed
-text \<open>curriculum_log_scale_over_scale_tendsto_zero: 対応する量が段階極限で 0 へ収束することを示す。\<close>
+text \<open>対応する量が段階極限で 0 へ収束することを示す。\<close>
 
 lemma curriculum_log_scale_over_scale_tendsto_zero:
   "((\<lambda>k. ln (real (curriculum_scale k)) / real (curriculum_scale k))
     \<longlongrightarrow> 0) sequentially"
   by (rule filterlim_compose[OF ln_x_over_x_tendsto_0
         curriculum_scale_filterlim])
-text \<open>curriculum_anchor_log_upper: 対数またはロジット比をスケール量に結び付ける。\<close>
+text \<open>対数またはロジット比をスケール量に結び付ける。\<close>
 
 lemma curriculum_anchor_log_upper:
   "ln (1 + real (curriculum_anchor_count k) *
@@ -2454,7 +2454,7 @@ proof -
     using K_positive by (simp add: ln_mult ln_realpow)
   show ?thesis using logarithm_upper logarithm_identity by simp
 qed
-text \<open>curriculum_anchor_log_over_scale_tendsto_zero: 対応する量が段階極限で 0 へ収束することを示す。\<close>
+text \<open>対応する量が段階極限で 0 へ収束することを示す。\<close>
 
 lemma curriculum_anchor_log_over_scale_tendsto_zero:
   "((\<lambda>k. ln (1 + real (curriculum_anchor_count k) *
@@ -2524,7 +2524,7 @@ proof -
   show ?thesis
     by (rule tendsto_sandwich[OF lower_bound upper_bound tendsto_const upper_limit])
 qed
-text \<open>curriculum_tail_takeover_eventually: 十分大きな段階で成立する評価を示す。\<close>
+text \<open>十分大きな段階で成立する評価を示す。\<close>
 
 lemma curriculum_tail_takeover_eventually:
   "\<forall>\<^sub>F k in sequentially.
@@ -2581,7 +2581,7 @@ proof -
       using unnormalized target_identity by linarith
   qed
 qed
-text \<open>curriculum_attack_margin_eventually: 十分大きな段階で成立する評価を示す。\<close>
+text \<open>十分大きな段階で成立する評価を示す。\<close>
 
 lemma curriculum_attack_margin_eventually:
   "\<forall>\<^sub>F k in sequentially.
@@ -2623,14 +2623,14 @@ proof -
             [OF eta_positive anchor_bound takeover_form])
   qed
 qed
-text \<open>curriculum_tail_fraction_exact: 対象量の厳密な閉形式を示す。\<close>
+text \<open>対象量の厳密な閉形式を示す。\<close>
 
 lemma curriculum_tail_fraction_exact:
   "real (curriculum_tail_count k) / real (curriculum_population k) =
     1 / real (curriculum_scale k)"
   using curriculum_tail_ratio_exact[of k]
   unfolding curriculum_tail_ratio_def .
-text \<open>curriculum_anchor_fraction_exact: 対象量の厳密な閉形式を示す。\<close>
+text \<open>対象量の厳密な閉形式を示す。\<close>
 
 lemma curriculum_anchor_fraction_exact:
   "real (curriculum_anchor_count k) / real (curriculum_population k) =
@@ -2649,7 +2649,7 @@ proof -
     by (simp add: add_divide_distrib[symmetric])
   show ?thesis using fraction_sum curriculum_tail_fraction_exact[of k] by linarith
 qed
-text \<open>curriculum_log_odds_exact: 対数またはロジット比をスケール量に結び付ける。\<close>
+text \<open>対数またはロジット比をスケール量に結び付ける。\<close>
 
 lemma curriculum_log_odds_exact:
   "ln ((real (curriculum_anchor_count k) / real (curriculum_population k)) /
@@ -2669,7 +2669,7 @@ proof -
   show ?thesis
     using ratio_identity curriculum_anchor_tail_ratio_exact[of k] by simp
 qed
-text \<open>curriculum_population_learning_mass: カリキュラムの個数または母集団分解を整理する。\<close>
+text \<open>カリキュラムの個数または母集団分解を整理する。\<close>
 
 lemma curriculum_population_learning_mass:
   "real (curriculum_population k) * curriculum_learning_rate k =
@@ -2681,7 +2681,7 @@ proof -
     unfolding curriculum_population_def curriculum_learning_rate_def
     using scale_nonzero by (simp add: field_simps; algebra)
 qed
-text \<open>curriculum_contraction_mass_exact: 更新写像の収縮係数とその漸近評価を示す。\<close>
+text \<open>更新写像の収縮係数とその漸近評価を示す。\<close>
 
 lemma curriculum_contraction_mass_exact:
   "real (curriculum_population k) * curriculum_learning_rate k *
@@ -2701,7 +2701,7 @@ proof -
       curriculum_anchor_fraction_exact[of k] algebraic_identity
     by simp
 qed
-text \<open>curriculum_contraction_power_le_exp: 更新写像の収縮係数とその漸近評価を示す。\<close>
+text \<open>更新写像の収縮係数とその漸近評価を示す。\<close>
 
 lemma curriculum_contraction_power_le_exp:
   "(1 - curriculum_learning_rate k *
@@ -2797,7 +2797,7 @@ proof -
   qed
   show ?thesis using power_bound exponential_identity by simp
 qed
-text \<open>curriculum_exp_contraction_tendsto_zero: 対応する量が段階極限で 0 へ収束することを示す。\<close>
+text \<open>対応する量が段階極限で 0 へ収束することを示す。\<close>
 
 lemma curriculum_exp_contraction_tendsto_zero:
   "((\<lambda>k. exp (-(real (curriculum_scale k) - 1)))
@@ -2818,7 +2818,7 @@ proof -
     using shifted by (simp add: filterlim_uminus_at_bot)
   show ?thesis by (rule filterlim_compose[OF exp_at_bot negative])
 qed
-text \<open>curriculum_contraction_factor_eventually_half: 十分大きな段階で成立する評価を示す。\<close>
+text \<open>十分大きな段階で成立する評価を示す。\<close>
 
 lemma curriculum_contraction_factor_eventually_half:
   "\<forall>\<^sub>F k in sequentially.
@@ -2852,7 +2852,7 @@ proof -
       using power_upper by linarith
   qed
 qed
-text \<open>curriculum_confidence_exact: 対象量の厳密な閉形式を示す。\<close>
+text \<open>対象量の厳密な閉形式を示す。\<close>
 
 lemma curriculum_confidence_exact:
   "curriculum_confidence k = curriculum_tail_ratio k ^ 12"
@@ -2864,14 +2864,14 @@ proof -
       curriculum_tail_count_def curriculum_population_def
     using scale_nonzero by (simp add: field_simps; algebra)
 qed
-text \<open>curriculum_confidence_positive: 対象量が正であること、または正側の評価を示す。\<close>
+text \<open>対象量が正であること、または正側の評価を示す。\<close>
 
 lemma curriculum_confidence_positive:
   "0 < curriculum_confidence k"
   unfolding curriculum_confidence_def
   using curriculum_scale_at_least_four[of k]
   by (intro divide_pos_pos) simp_all
-text \<open>curriculum_confidence_at_most_one: 対象量の上界を示す。\<close>
+text \<open>対象量の上界を示す。\<close>
 
 lemma curriculum_confidence_at_most_one:
   "curriculum_confidence k \<le> 1"
@@ -2883,7 +2883,7 @@ proof -
     by (rule frac_le) (use denominator_at_least_one in simp_all)
   then show ?thesis unfolding curriculum_confidence_def by simp
 qed
-text \<open>curriculum_confidence_tendsto_zero: 対応する量が段階極限で 0 へ収束することを示す。\<close>
+text \<open>対応する量が段階極限で 0 へ収束することを示す。\<close>
 
 lemma curriculum_confidence_tendsto_zero:
   "(curriculum_confidence \<longlongrightarrow> 0) sequentially"
@@ -2897,14 +2897,14 @@ proof -
     by (rule ext) (simp add: curriculum_confidence_exact)
   show ?thesis using power_limit function_identity by simp
 qed
-text \<open>curriculum_random_error: カリキュラムのランダム順序誤差を定める。\<close>
+text \<open>カリキュラムのランダム順序誤差を定める。\<close>
 
 definition curriculum_random_error :: "nat \<Rightarrow> real" where
   "curriculum_random_error k =
     curriculum_learning_rate k *
       sqrt (real (curriculum_population k) / 2 *
         ln (2 * real (curriculum_population k) / curriculum_confidence k))"
-text \<open>curriculum_random_log_argument: 対数またはロジット比をスケール量に結び付ける。\<close>
+text \<open>対数またはロジット比をスケール量に結び付ける。\<close>
 
 lemma curriculum_random_log_argument:
   "2 * real (curriculum_population k) / curriculum_confidence k =
@@ -2916,7 +2916,7 @@ proof -
     unfolding curriculum_population_def curriculum_confidence_def
     using scale_nonzero by (simp add: field_simps; algebra)
 qed
-text \<open>curriculum_random_log_nonnegative: 対数またはロジット比をスケール量に結び付ける。\<close>
+text \<open>対数またはロジット比をスケール量に結び付ける。\<close>
 
 lemma curriculum_random_log_nonnegative:
   "0 \<le> ln (2 * real (curriculum_population k) / curriculum_confidence k)"
@@ -2931,7 +2931,7 @@ proof -
   have "0 \<le> ln (2 * ?K^18)" using argument_at_least_one by simp
   then show ?thesis using curriculum_random_log_argument[of k] by simp
 qed
-text \<open>curriculum_random_error_nonnegative: 誤差または状態の明示的な上界を与える。\<close>
+text \<open>誤差または状態の明示的な上界を与える。\<close>
 
 lemma curriculum_random_error_nonnegative:
   "0 \<le> curriculum_random_error k"
@@ -2952,7 +2952,7 @@ proof -
   show ?thesis unfolding curriculum_random_error_def
     by (rule mult_nonneg_nonneg[OF eta_nonnegative root_nonnegative])
 qed
-text \<open>curriculum_random_error_square: 誤差または状態の明示的な上界を与える。\<close>
+text \<open>誤差または状態の明示的な上界を与える。\<close>
 
 lemma curriculum_random_error_square:
   "curriculum_random_error k ^ 2 =
@@ -2982,7 +2982,7 @@ proof -
     using square_expansion coefficient_identity curriculum_random_log_argument[of k]
     by algebra
 qed
-text \<open>curriculum_random_error_square_tendsto_zero: 対応する量が段階極限で 0 へ収束することを示す。\<close>
+text \<open>対応する量が段階極限で 0 へ収束することを示す。\<close>
 
 lemma curriculum_random_error_square_tendsto_zero:
   "((\<lambda>k. curriculum_random_error k ^ 2)
@@ -3055,7 +3055,7 @@ proof -
   show ?thesis
     using normalized_limit by (simp add: curriculum_random_error_square)
 qed
-text \<open>curriculum_random_error_tendsto_zero: 対応する量が段階極限で 0 へ収束することを示す。\<close>
+text \<open>対応する量が段階極限で 0 へ収束することを示す。\<close>
 
 lemma curriculum_random_error_tendsto_zero:
   "(curriculum_random_error \<longlongrightarrow> 0) sequentially"
@@ -3078,7 +3078,7 @@ proof -
   qed
   show ?thesis using root_limit function_identity by simp
 qed
-text \<open>curriculum_log_odds_filterlim: 対応する量が段階極限で 0 へ収束することを示す。\<close>
+text \<open>対応する量が段階極限で 0 へ収束することを示す。\<close>
 
 lemma curriculum_log_odds_filterlim:
   "filterlim (\<lambda>k. ln (real (curriculum_scale k) - 1))
@@ -3100,7 +3100,7 @@ proof -
   show ?thesis using logarithm_filterlim
     by (simp add: curriculum_log_odds_exact)
 qed
-text \<open>curriculum_random_margin_exact: 更新後の分類マージンを評価する。\<close>
+text \<open>更新後の分類マージンを評価する。\<close>
 
 lemma curriculum_random_margin_exact:
   "random_order_lower_margin
@@ -3115,7 +3115,7 @@ lemma curriculum_random_margin_exact:
   unfolding random_order_lower_margin_def curriculum_random_error_def
   using curriculum_log_odds_exact[of k]
   by simp
-text \<open>curriculum_random_margin_eventually_gt_one: 更新後の分類マージンを評価する。\<close>
+text \<open>更新後の分類マージンを評価する。\<close>
 
 lemma curriculum_random_margin_eventually_gt_one:
   "\<forall>\<^sub>F k in sequentially.
@@ -3163,7 +3163,7 @@ proof -
       using product_lower facts curriculum_random_margin_exact[of k] by linarith
   qed
 qed
-text \<open>curriculum_momentum_transfer_error_exact_general: 理想更新と摂動付き更新の差を評価し、性質を移送する。\<close>
+text \<open>理想更新と摂動付き更新の差を評価し、性質を移送する。\<close>
 
 lemma curriculum_momentum_transfer_error_exact_general:
   assumes mu_less_one: "mu < 1"
@@ -3229,7 +3229,7 @@ proof -
     using inverse_square inverse_coefficient by algebra
   finally show ?thesis .
 qed
-text \<open>curriculum_momentum_transfer_error_tendsto_zero_general: 理想更新と摂動付き更新の差を評価し、性質を移送する。\<close>
+text \<open>理想更新と摂動付き更新の差を評価し、性質を移送する。\<close>
 
 lemma curriculum_momentum_transfer_error_tendsto_zero_general:
   assumes mu_less_one: "mu < 1"
@@ -3276,7 +3276,7 @@ proof -
       (rule curriculum_momentum_transfer_error_exact_general[OF mu_less_one])
   show ?thesis using total_limit function_identity by simp
 qed
-text \<open>curriculum_momentum_transfer_error_eventually_small_general: 理想更新と摂動付き更新の差を評価し、性質を移送する。\<close>
+text \<open>理想更新と摂動付き更新の差を評価し、性質を移送する。\<close>
 
 lemma curriculum_momentum_transfer_error_eventually_small_general:
   assumes mu_less_one: "mu < 1" and margin_positive: "0 < G"
@@ -3289,14 +3289,14 @@ proof -
       of G]
   show ?thesis using eventual_upper margin_positive by simp
 qed
-text \<open>curriculum_tail_ratio_nonnegative: アンカーとテールの比率に関する恒等式または境界を示す。\<close>
+text \<open>アンカーとテールの比率に関する恒等式または境界を示す。\<close>
 
 lemma curriculum_tail_ratio_nonnegative:
   "0 \<le> curriculum_tail_ratio k"
   unfolding curriculum_tail_ratio_def
   using curriculum_population_positive[of k]
   by (intro divide_nonneg_nonneg) simp_all
-text \<open>curriculum_tail_ratio_below_half: アンカーとテールの比率に関する恒等式または境界を示す。\<close>
+text \<open>アンカーとテールの比率に関する恒等式または境界を示す。\<close>
 
 lemma curriculum_tail_ratio_below_half:
   "curriculum_tail_ratio k < 1 / 2"
@@ -3309,7 +3309,7 @@ proof -
   show ?thesis using inverse_at_most_quarter
     by (simp add: curriculum_tail_ratio_exact)
 qed
-text \<open>curriculum_learning_rate_tendsto_zero: 対応する量が段階極限で 0 へ収束することを示す。\<close>
+text \<open>対応する量が段階極限で 0 へ収束することを示す。\<close>
 
 lemma curriculum_learning_rate_tendsto_zero:
   "(curriculum_learning_rate \<longlongrightarrow> 0) sequentially"
@@ -3329,7 +3329,7 @@ proof -
   qed
   show ?thesis using power_limit function_identity by simp
 qed
-text \<open>curriculum_clean_metric_limits: リスクと AUC の極限をまとめて示す。\<close>
+text \<open>リスクと AUC の極限をまとめて示す。\<close>
 
 lemma curriculum_clean_metric_limits:
   "((\<lambda>k. 1 - curriculum_tail_ratio k) \<longlongrightarrow> 1) sequentially"
@@ -3359,7 +3359,7 @@ proof -
       curriculum_tail_ratio k ^ 2) \<longlongrightarrow> 0) sequentially"
     using tendsto_diff[OF twice_limit square_limit] by simp
 qed
-text \<open>curriculum_scalar_inversion_eventually: 十分大きな段階で成立する評価を示す。\<close>
+text \<open>十分大きな段階で成立する評価を示す。\<close>
 
 theorem curriculum_scalar_inversion_eventually:
   "\<forall>\<^sub>F k in sequentially.
@@ -3473,7 +3473,7 @@ proof -
       using result(1) result(2) result(3) by blast
   qed
 qed
-text \<open>curriculum_attack_risk_tendsto_one: 対応する量が段階極限で 1 へ収束することを示す。\<close>
+text \<open>対応する量が段階極限で 1 へ収束することを示す。\<close>
 
 lemma curriculum_attack_risk_tendsto_one:
   "((\<lambda>k. clean_test_risk (curriculum_tail_ratio k)
@@ -3493,7 +3493,7 @@ proof -
     by (rule Lim_transform_eventually
         [OF curriculum_clean_metric_limits(1) eventual_identity])
 qed
-text \<open>curriculum_attack_auc_tendsto_zero: 対応する量が段階極限で 0 へ収束することを示す。\<close>
+text \<open>対応する量が段階極限で 0 へ収束することを示す。\<close>
 
 lemma curriculum_attack_auc_tendsto_zero:
   "((\<lambda>k. clean_test_auc (curriculum_tail_ratio k)
@@ -3513,7 +3513,7 @@ proof -
     by (rule Lim_transform_eventually
         [OF curriculum_tail_ratio_tendsto_zero eventual_identity])
 qed
-text \<open>curriculum_realizable_inversion_eventually: 十分大きな段階で成立する評価を示す。\<close>
+text \<open>十分大きな段階で成立する評価を示す。\<close>
 
 theorem curriculum_realizable_inversion_eventually:
   fixes xs_attack xs_random :: "nat \<Rightarrow> bool list"
@@ -3614,7 +3614,7 @@ proof -
       using result error_small by simp
   qed
 qed
-text \<open>curriculum_momentum_effective_step_tendsto_zero: 対応する量が段階極限で 0 へ収束することを示す。\<close>
+text \<open>対応する量が段階極限で 0 へ収束することを示す。\<close>
 
 lemma curriculum_momentum_effective_step_tendsto_zero:
   assumes mu_less_one: "mu < 1"
@@ -3631,7 +3631,7 @@ proof -
   show ?thesis using quotient_limit denominator_nonzero
     by (simp add: momentum_effective_step_def)
 qed
-text \<open>curriculum_momentum_inversion_eventually: 十分大きな段階で成立する評価を示す。\<close>
+text \<open>十分大きな段階で成立する評価を示す。\<close>
 
 theorem curriculum_momentum_inversion_eventually:
   fixes mu :: real and xs_attack xs_random :: "nat \<Rightarrow> bool list"
@@ -3710,7 +3710,7 @@ proof -
       using result conditions by simp
   qed
 qed
-text \<open>curriculum_realizable_metric_limits: リスクと AUC の極限をまとめて示す。\<close>
+text \<open>リスクと AUC の極限をまとめて示す。\<close>
 
 theorem curriculum_realizable_metric_limits:
   fixes xs_attack xs_random :: "nat \<Rightarrow> bool list"
@@ -3811,7 +3811,7 @@ proof -
       using identities by eventually_elim simp
   qed
 qed
-text \<open>curriculum_momentum_metric_limits: リスクと AUC の極限をまとめて示す。\<close>
+text \<open>リスクと AUC の極限をまとめて示す。\<close>
 
 theorem curriculum_momentum_metric_limits:
   fixes mu :: real and xs_attack xs_random :: "nat \<Rightarrow> bool list"
@@ -3881,7 +3881,7 @@ proof -
       using identities by eventually_elim simp
   qed
 qed
-text \<open>curriculum_random_inversion_event: ランダム順序でスカラー反転が起こる事象を定める。\<close>
+text \<open>ランダム順序でスカラー反転が起こる事象を定める。\<close>
 
 definition curriculum_random_inversion_event :: "nat \<Rightarrow> bool list set" where
   "curriculum_random_inversion_event k =
@@ -3907,7 +3907,7 @@ definition curriculum_random_inversion_event :: "nat \<Rightarrow> bool list set
           (binary_logistic_state (curriculum_learning_rate k)
             (real (curriculum_anchor_count k) / real (curriculum_population k))
             xs (curriculum_population k))}"
-text \<open>curriculum_random_inversion_probability_eventually: 十分大きな段階で成立する評価を示す。\<close>
+text \<open>十分大きな段階で成立する評価を示す。\<close>
 
 lemma curriculum_random_inversion_probability_eventually:
   "\<forall>\<^sub>F k in sequentially. 1 - curriculum_confidence k \<le>
@@ -3917,7 +3917,7 @@ lemma curriculum_random_inversion_probability_eventually:
   using curriculum_scalar_inversion_eventually
   unfolding curriculum_random_inversion_event_def
   by eventually_elim blast
-text \<open>order_only_inversion_conditional_asymptotic: 攻撃順序と正常順序の間で学習挙動が反転することを示す。\<close>
+text \<open>攻撃順序と正常順序の間で学習挙動が反転することを示す。\<close>
 
 theorem order_only_inversion_conditional_asymptotic:
   fixes mu :: real and xs_attack xs_random :: "nat \<Rightarrow> bool list"
@@ -4066,7 +4066,7 @@ proof -
     by (rule curriculum_momentum_transfer_error_tendsto_zero_general
         [OF mu_less_one])
 qed
-text \<open>curriculum_explicit_realizable_attack_metrics_eventually: 十分大きな段階で成立する評価を示す。\<close>
+text \<open>十分大きな段階で成立する評価を示す。\<close>
 
 lemma curriculum_explicit_realizable_attack_metrics_eventually:
   shows "\<forall>\<^sub>F k in sequentially.
@@ -4165,7 +4165,7 @@ proof -
     qed
   qed
 qed
-text \<open>curriculum_explicit_realizable_attack_metric_limits: リスクと AUC の極限をまとめて示す。\<close>
+text \<open>リスクと AUC の極限をまとめて示す。\<close>
 
 lemma curriculum_explicit_realizable_attack_metric_limits:
   "((\<lambda>k.
@@ -4236,7 +4236,7 @@ proof (intro tendsto_Pair)
       by eventually_elim simp
   qed
 qed
-text \<open>curriculum_realizable_random_benign_event: 実現可能モデルで正常なリスクと AUC が得られる順序事象を定める。\<close>
+text \<open>実現可能モデルで正常なリスクと AUC が得られる順序事象を定める。\<close>
 
 definition curriculum_realizable_random_benign_event :: "nat \<Rightarrow> bool list set" where
   "curriculum_realizable_random_benign_event k = {xs.
@@ -4252,13 +4252,13 @@ definition curriculum_realizable_random_benign_event :: "nat \<Rightarrow> bool 
       (realizable_u_state (curriculum_learning_rate k)
         (curriculum_realizable_scale k) xs (curriculum_population k)) =
       1 - curriculum_tail_ratio k ^ 2}"
-text \<open>curriculum_realizable_random_benign_probability: 実現可能な正常事象の一様確率を定める。\<close>
+text \<open>実現可能な正常事象の一様確率を定める。\<close>
 
 definition curriculum_realizable_random_benign_probability :: "nat \<Rightarrow> real" where
   "curriculum_realizable_random_benign_probability k = uniform_probability
     (binary_orders (curriculum_anchor_count k) (curriculum_population k))
     (curriculum_realizable_random_benign_event k)"
-text \<open>curriculum_realizable_random_probability_eventually: 十分大きな段階で成立する評価を示す。\<close>
+text \<open>十分大きな段階で成立する評価を示す。\<close>
 
 lemma curriculum_realizable_random_probability_eventually:
   "\<forall>\<^sub>F k in sequentially. 1 - curriculum_confidence k \<le>
@@ -4333,7 +4333,7 @@ proof -
       using confidence probability_mono by linarith
   qed
 qed
-text \<open>curriculum_realizable_random_benign_probability_tendsto_one: 対応する量が段階極限で 1 へ収束することを示す。\<close>
+text \<open>対応する量が段階極限で 1 へ収束することを示す。\<close>
 
 lemma curriculum_realizable_random_benign_probability_tendsto_one:
   "(curriculum_realizable_random_benign_probability \<longlongrightarrow> 1) sequentially"
@@ -4349,7 +4349,7 @@ proof -
     curriculum_realizable_random_probability_eventually upper_bound
     lower_limit tendsto_const])
 qed
-text \<open>order_only_inversion_complete_asymptotic: 攻撃順序と正常順序の間で学習挙動が反転することを示す。\<close>
+text \<open>攻撃順序と正常順序の間で学習挙動が反転することを示す。\<close>
 
 theorem order_only_inversion_complete_asymptotic:
   shows "(curriculum_tail_ratio \<longlongrightarrow> 0) sequentially"
@@ -4519,18 +4519,18 @@ proof -
       (curriculum_population k)) \<longlongrightarrow> 0) sequentially"
     by (rule curriculum_momentum_transfer_error_tendsto_zero_general) simp
 qed
-text \<open>linearly_realizable: マージン列が一つの線形重みで正になる条件を定める。\<close>
+text \<open>マージン列が一つの線形重みで正になる条件を定める。\<close>
 
 definition linearly_realizable :: "real list \<Rightarrow> bool" where
   "linearly_realizable margins \<longleftrightarrow>
     (\<exists>w. \<forall>z \<in> set margins. 0 < w * z)"
-text \<open>uniform_margin_realizable: 有界重みで一様マージンを保証する条件を定める。\<close>
+text \<open>有界重みで一様マージンを保証する条件を定める。\<close>
 
 definition uniform_margin_realizable ::
     "real \<Rightarrow> real \<Rightarrow> real list \<Rightarrow> bool" where
   "uniform_margin_realizable gamma B margins \<longleftrightarrow>
     (\<exists>w. abs w \<le> B \<and> (\<forall>z \<in> set margins. gamma \<le> w * z))"
-text \<open>uniform_margin_realizable_imp_linearly_realizable: 更新後の分類マージンを評価する。\<close>
+text \<open>更新後の分類マージンを評価する。\<close>
 
 lemma uniform_margin_realizable_imp_linearly_realizable:
   assumes gamma_positive: "0 < gamma"
@@ -4549,22 +4549,22 @@ proof -
     then show "0 < w * z" using gamma_positive by linarith
   qed
 qed
-text \<open>inversion_exponent_regime: スケーリング指数が反転に適する領域を定める。\<close>
+text \<open>スケーリング指数が反転に適する領域を定める。\<close>
 
 definition inversion_exponent_regime :: "real \<Rightarrow> real \<Rightarrow> bool" where
   "inversion_exponent_regime a b \<longleftrightarrow> a / 2 < b \<and> b < a - 1"
-text \<open>inversion_exponent_regime_conditions: 攻撃順序と正常順序の間で学習挙動が反転することを示す。\<close>
+text \<open>攻撃順序と正常順序の間で学習挙動が反転することを示す。\<close>
 lemma inversion_exponent_regime_conditions:
   assumes regime: "inversion_exponent_regime a b"
   shows "2 < a" "0 < b - a / 2" "0 < a - 1 - b"
   using regime unfolding inversion_exponent_regime_def by linarith+
 
-text \<open>admissible_momentum_schedule: 全段階で 0 以上 1 未満となるモメンタム列を定める。\<close>
+text \<open>全段階で 0 以上 1 未満となるモメンタム列を定める。\<close>
 definition admissible_momentum_schedule :: "(nat \<Rightarrow> real) \<Rightarrow> bool" where
   "admissible_momentum_schedule mu \<longleftrightarrow>
     (\<forall>k. 0 \<le> mu k \<and> mu k < 1)"
 
-text \<open>varying_momentum_transfer_eventually_small: 十分大きな段階で成立する評価を示す。\<close>
+text \<open>十分大きな段階で成立する評価を示す。\<close>
 lemma varying_momentum_transfer_eventually_small:
   assumes error_limit:
       "((\<lambda>k. momentum_transfer_error (eta k) (mu k) (N k))
@@ -4577,7 +4577,7 @@ proof -
   show ?thesis using eventual_upper margin_positive by simp
 qed
 
-text \<open>normed_perturbation_transfer: 理想更新と摂動付き更新の差を評価し、性質を移送する。\<close>
+text \<open>理想更新と摂動付き更新の差を評価し、性質を移送する。\<close>
 lemma normed_perturbation_transfer:
   fixes F :: "'a::real_normed_vector \<Rightarrow> 'a"
   assumes nonexpansive: "norm (F x - F y) \<le> norm (x - y)"
@@ -4592,19 +4592,19 @@ qed
 section \<open>Integer power-law families\<close>
 
 
-text \<open>power_population: 基本スケールの指数 a による母集団サイズを定める。\<close>
+text \<open>基本スケールの指数 a による母集団サイズを定める。\<close>
 definition power_population :: "nat \<Rightarrow> nat \<Rightarrow> nat" where
   "power_population a k = curriculum_scale k ^ a"
 
-text \<open>power_tail: 基本スケールの指数 c によるテールサイズを定める。\<close>
+text \<open>基本スケールの指数 c によるテールサイズを定める。\<close>
 definition power_tail :: "nat \<Rightarrow> nat \<Rightarrow> nat" where
   "power_tail c k = curriculum_scale k ^ c"
 
-text \<open>power_learning_rate: 基本スケールの指数 b による学習率を定める。\<close>
+text \<open>基本スケールの指数 b による学習率を定める。\<close>
 definition power_learning_rate :: "nat \<Rightarrow> nat \<Rightarrow> real" where
   "power_learning_rate b k = 1 / real (curriculum_scale k) ^ b"
 
-text \<open>inverse_curriculum_power_tendsto_zero: 対応する量が段階極限で 0 へ収束することを示す。\<close>
+text \<open>対応する量が段階極限で 0 へ収束することを示す。\<close>
 lemma inverse_curriculum_power_tendsto_zero:
   assumes exponent_positive: "0 < d"
   shows "((\<lambda>k. 1 / real (curriculum_scale k) ^ d) \<longlongrightarrow> 0) sequentially"
@@ -4629,7 +4629,7 @@ proof -
     by (fact powered_zero)
 qed
 
-text \<open>power_law_scaling: 冪スケーリング族の対応する漸近性質を示す。\<close>
+text \<open>冪スケーリング族の対応する漸近性質を示す。\<close>
 theorem power_law_scaling:
   assumes noise_condition: "a < 2 * b"
     and takeover_condition: "b < c"
@@ -4728,7 +4728,7 @@ proof -
     qed
   qed
 qed
-text \<open>power_law_anchor_tail_scaling: 冪スケーリング族の対応する漸近性質を示す。\<close>
+text \<open>冪スケーリング族の対応する漸近性質を示す。\<close>
 theorem power_law_anchor_tail_scaling:
   assumes noise_condition: "a < 2 * b"
     and takeover_condition: "b + 1 < a"
@@ -4757,7 +4757,7 @@ proof -
           tail_below_population])
 qed
 
-text \<open>power_law_6_4_scaling: 冪スケーリング族の対応する漸近性質を示す。\<close>
+text \<open>冪スケーリング族の対応する漸近性質を示す。\<close>
 corollary power_law_6_4_scaling:
   "((\<lambda>k. real (power_tail 5 k) / real (power_population 6 k))
       \<longlongrightarrow> 0) sequentially"
@@ -4768,20 +4768,20 @@ corollary power_law_6_4_scaling:
   using power_law_anchor_tail_scaling[of 6 4] by simp_all
 
 
-text \<open>power_anchor: 母集団から冪テールを除いたアンカーサイズを定める。\<close>
+text \<open>母集団から冪テールを除いたアンカーサイズを定める。\<close>
 definition power_anchor :: "nat \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> nat" where
   "power_anchor a c k = power_population a k - power_tail c k"
 
-text \<open>power_confidence: 冪スケーリングの信頼度誤差を定める。\<close>
+text \<open>冪スケーリングの信頼度誤差を定める。\<close>
 definition power_confidence :: "nat \<Rightarrow> real" where
   "power_confidence k = 1 / real (curriculum_scale k) ^ 2"
 
-text \<open>power_tail_ratio: 冪スケーリングのテール比率を定める。\<close>
+text \<open>冪スケーリングのテール比率を定める。\<close>
 definition power_tail_ratio :: "nat \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> real" where
   "power_tail_ratio a c k =
     real (power_tail c k) / real (power_population a k)"
 
-text \<open>power_tail_le_population: カリキュラムの個数または母集団分解を整理する。\<close>
+text \<open>カリキュラムの個数または母集団分解を整理する。\<close>
 lemma power_tail_le_population:
   assumes "c < a"
   shows "power_tail c k \<le> power_population a k"
@@ -4804,33 +4804,33 @@ proof -
   show ?thesis unfolding power_tail_def power_population_def by (rule raw)
 qed
 
-text \<open>power_counts: カリキュラムの個数または母集団分解を整理する。\<close>
+text \<open>カリキュラムの個数または母集団分解を整理する。\<close>
 lemma power_counts:
   assumes "c < a"
   shows "power_tail c k + power_anchor a c k = power_population a k"
   unfolding power_anchor_def using power_tail_le_population[OF assms] by simp
 
-text \<open>power_population_positive: 対象量が正であること、または正側の評価を示す。\<close>
+text \<open>対象量が正であること、または正側の評価を示す。\<close>
 lemma power_population_positive: "0 < power_population a k"
   unfolding power_population_def
   using curriculum_scale_at_least_four[of k] by simp
 
-text \<open>power_tail_positive: 対象量が正であること、または正側の評価を示す。\<close>
+text \<open>対象量が正であること、または正側の評価を示す。\<close>
 lemma power_tail_positive: "0 < power_tail c k"
   unfolding power_tail_def
   using curriculum_scale_at_least_four[of k] by simp
 
-text \<open>power_learning_rate_positive: 対象量が正であること、または正側の評価を示す。\<close>
+text \<open>対象量が正であること、または正側の評価を示す。\<close>
 lemma power_learning_rate_positive: "0 < power_learning_rate b k"
   unfolding power_learning_rate_def
   using curriculum_scale_at_least_four[of k] by simp
 
-text \<open>power_confidence_positive: 対象量が正であること、または正側の評価を示す。\<close>
+text \<open>対象量が正であること、または正側の評価を示す。\<close>
 lemma power_confidence_positive: "0 < power_confidence k"
   unfolding power_confidence_def
   using curriculum_scale_at_least_four[of k] by simp
 
-text \<open>power_confidence_at_most_one: 対象量の上界を示す。\<close>
+text \<open>対象量の上界を示す。\<close>
 lemma power_confidence_at_most_one: "power_confidence k \<le> 1"
 proof -
   have "1 \<le> real (curriculum_scale k) ^ 2"
@@ -4840,13 +4840,13 @@ proof -
   then show ?thesis unfolding power_confidence_def by simp
 qed
 
-text \<open>power_confidence_tendsto_zero: 対応する量が段階極限で 0 へ収束することを示す。\<close>
+text \<open>対応する量が段階極限で 0 へ収束することを示す。\<close>
 lemma power_confidence_tendsto_zero:
   "(power_confidence \<longlongrightarrow> 0) sequentially"
   unfolding power_confidence_def
   by (rule inverse_curriculum_power_tendsto_zero) simp
 
-text \<open>power_population_factorization: カリキュラムの個数または母集団分解を整理する。\<close>
+text \<open>カリキュラムの個数または母集団分解を整理する。\<close>
 lemma power_population_factorization:
   assumes tail_below_population: "c < a"
   shows "power_population a k =
@@ -4866,7 +4866,7 @@ proof -
   show ?thesis unfolding power_population_def power_tail_def by (rule raw)
 qed
 
-text \<open>power_tail_ratio_exact: アンカーとテールの比率に関する恒等式または境界を示す。\<close>
+text \<open>アンカーとテールの比率に関する恒等式または境界を示す。\<close>
 lemma power_tail_ratio_exact:
   assumes tail_below_population: "c < a"
   shows "power_tail_ratio a c k =
@@ -4887,7 +4887,7 @@ proof -
     by (simp add: field_simps)
 qed
 
-text \<open>power_tail_ratio_tendsto_zero: 対応する量が段階極限で 0 へ収束することを示す。\<close>
+text \<open>対応する量が段階極限で 0 へ収束することを示す。\<close>
 lemma power_tail_ratio_tendsto_zero:
   assumes tail_below_population: "c < a"
   shows "((\<lambda>k. power_tail_ratio a c k) \<longlongrightarrow> 0) sequentially"
@@ -4895,7 +4895,7 @@ lemma power_tail_ratio_tendsto_zero:
     tail_below_population
   by (simp add: power_tail_ratio_exact)
 
-text \<open>power_tail_less_anchor: 冪スケーリング族の対応する漸近性質を示す。\<close>
+text \<open>冪スケーリング族の対応する漸近性質を示す。\<close>
 lemma power_tail_less_anchor:
   assumes tail_below_population: "c < a"
   shows "power_tail c k < power_anchor a c k"
@@ -4929,7 +4929,7 @@ proof -
   show ?thesis using twice_tail_below_population counts by linarith
 qed
 
-text \<open>power_learning_rate_at_most_one: 対象量の上界を示す。\<close>
+text \<open>対象量の上界を示す。\<close>
 lemma power_learning_rate_at_most_one:
   "power_learning_rate b k \<le> 1"
 proof -
@@ -4941,7 +4941,7 @@ proof -
   then show ?thesis unfolding power_learning_rate_def by simp
 qed
 
-text \<open>power_effective_tail_mass_exact: 対象量の厳密な閉形式を示す。\<close>
+text \<open>対象量の厳密な閉形式を示す。\<close>
 lemma power_effective_tail_mass_exact:
   assumes rate_below_tail: "b < c"
   shows "power_learning_rate b k * real (power_tail c k) =
@@ -4962,7 +4962,7 @@ proof -
     using K_nonzero power_factor by (simp add: field_simps)
 qed
 
-text \<open>power_effective_tail_mass_at_least_scale: 対象量の下界を示す。\<close>
+text \<open>対象量の下界を示す。\<close>
 lemma power_effective_tail_mass_at_least_scale:
   assumes rate_below_tail: "b < c"
   shows "real (curriculum_scale k) \<le>
@@ -4984,7 +4984,7 @@ proof -
     using power_effective_tail_mass_exact[OF rate_below_tail, of k] by simp
 qed
 
-text \<open>power_anchor_log_upper: 対数またはロジット比をスケール量に結び付ける。\<close>
+text \<open>対数またはロジット比をスケール量に結び付ける。\<close>
 lemma power_anchor_log_upper:
   assumes tail_below_population: "c < a"
   shows "ln (1 + real (power_anchor a c k) *
@@ -5043,7 +5043,7 @@ proof -
   show ?thesis using logarithm_upper logarithm_identity by simp
 qed
 
-text \<open>power_anchor_log_over_scale_tendsto_zero: 対応する量が段階極限で 0 へ収束することを示す。\<close>
+text \<open>対応する量が段階極限で 0 へ収束することを示す。\<close>
 lemma power_anchor_log_over_scale_tendsto_zero:
   assumes tail_below_population: "c < a"
   shows "((\<lambda>k. ln (1 + real (power_anchor a c k) *
@@ -5102,7 +5102,7 @@ proof -
     by (rule tendsto_sandwich[OF lower_bound upper_bound tendsto_const upper_limit])
 qed
 
-text \<open>power_tail_takeover_eventually: 十分大きな段階で成立する評価を示す。\<close>
+text \<open>十分大きな段階で成立する評価を示す。\<close>
 lemma power_tail_takeover_eventually:
   assumes rate_below_tail: "b < c"
     and tail_below_population: "c < a"
@@ -5156,7 +5156,7 @@ proof -
   qed
 qed
 
-text \<open>power_attack_margin_eventually: 十分大きな段階で成立する評価を示す。\<close>
+text \<open>十分大きな段階で成立する評価を示す。\<close>
 lemma power_attack_margin_eventually:
   assumes rate_below_tail: "b < c"
     and tail_below_population: "c < a"
@@ -5194,7 +5194,7 @@ proof (rule eventually_mono[OF power_tail_takeover_eventually
       [OF eta_positive anchor_bound takeover_form])
 qed
 
-text \<open>logistic_contraction_power_le_exp: 対数またはロジット比をスケール量に結び付ける。\<close>
+text \<open>対数またはロジット比をスケール量に結び付ける。\<close>
 lemma logistic_contraction_power_le_exp:
   fixes eta :: real
   assumes N_positive: "0 < N"
@@ -5251,7 +5251,7 @@ proof -
   finally show ?thesis by (simp only: mult.assoc)
 qed
 
-text \<open>power_contraction_mass_at_least_half_scale: 対象量の下界を示す。\<close>
+text \<open>対象量の下界を示す。\<close>
 lemma power_contraction_mass_at_least_half_scale:
   assumes rate_below_tail: "b < c"
     and tail_below_population: "c < a"
@@ -5297,7 +5297,7 @@ proof -
   qed
 qed
 
-text \<open>power_exp_half_scale_tendsto_zero: 対応する量が段階極限で 0 へ収束することを示す。\<close>
+text \<open>対応する量が段階極限で 0 へ収束することを示す。\<close>
 lemma power_exp_half_scale_tendsto_zero:
   "((\<lambda>k. exp (-(real (curriculum_scale k) / 2))) \<longlongrightarrow> 0) sequentially"
 proof -
@@ -5319,7 +5319,7 @@ proof -
   show ?thesis by (rule filterlim_compose[OF exp_at_bot negative])
 qed
 
-text \<open>power_contraction_factor_eventually_half: 十分大きな段階で成立する評価を示す。\<close>
+text \<open>十分大きな段階で成立する評価を示す。\<close>
 lemma power_contraction_factor_eventually_half:
   assumes rate_below_tail: "b < c"
     and tail_below_population: "c < a"
@@ -5364,7 +5364,7 @@ proof -
   qed
 qed
 
-text \<open>power_anchor_tail_ratio_exact: アンカーとテールの比率に関する恒等式または境界を示す。\<close>
+text \<open>アンカーとテールの比率に関する恒等式または境界を示す。\<close>
 lemma power_anchor_tail_ratio_exact:
   assumes tail_below_population: "c < a"
   shows "real (power_anchor a c k) / real (power_tail c k) =
@@ -5385,7 +5385,7 @@ proof -
     by (simp add: field_simps; algebra)
 qed
 
-text \<open>power_log_odds_exact: 対数またはロジット比をスケール量に結び付ける。\<close>
+text \<open>対数またはロジット比をスケール量に結び付ける。\<close>
 lemma power_log_odds_exact:
   assumes tail_below_population: "c < a"
   shows "ln ((real (power_anchor a c k) / real (power_population a k)) /
@@ -5406,7 +5406,7 @@ proof -
     by simp
 qed
 
-text \<open>power_log_odds_filterlim: 対応する量が段階極限で 0 へ収束することを示す。\<close>
+text \<open>対応する量が段階極限で 0 へ収束することを示す。\<close>
 lemma power_log_odds_filterlim:
   assumes tail_below_population: "c < a"
   shows "filterlim (\<lambda>k. ln (real (curriculum_scale k) ^ (a - c) - 1))
@@ -5448,13 +5448,13 @@ proof -
   qed
 qed
 
-text \<open>power_random_error: 冪スケーリングのランダム順序誤差を定める。\<close>
+text \<open>冪スケーリングのランダム順序誤差を定める。\<close>
 definition power_random_error :: "nat \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> real" where
   "power_random_error a b k = power_learning_rate b k *
     sqrt (real (power_population a k) / 2 *
       ln (2 * real (power_population a k) / power_confidence k))"
 
-text \<open>power_random_log_argument: 対数またはロジット比をスケール量に結び付ける。\<close>
+text \<open>対数またはロジット比をスケール量に結び付ける。\<close>
 lemma power_random_log_argument:
   "2 * real (power_population a k) / power_confidence k =
     2 * real (curriculum_scale k) ^ (a + 2)"
@@ -5468,7 +5468,7 @@ proof -
     using K_nonzero power_sum by (simp add: field_simps)
 qed
 
-text \<open>power_random_log_nonnegative: 対数またはロジット比をスケール量に結び付ける。\<close>
+text \<open>対数またはロジット比をスケール量に結び付ける。\<close>
 lemma power_random_log_nonnegative:
   "0 \<le> ln (2 * real (power_population a k) / power_confidence k)"
 proof -
@@ -5481,7 +5481,7 @@ proof -
   then show ?thesis using power_random_log_argument[of a k] by simp
 qed
 
-text \<open>power_random_error_nonnegative: 誤差または状態の明示的な上界を与える。\<close>
+text \<open>誤差または状態の明示的な上界を与える。\<close>
 lemma power_random_error_nonnegative:
   "0 \<le> power_random_error a b k"
 proof -
@@ -5496,7 +5496,7 @@ proof -
       (use power_learning_rate_positive[of b k] in linarith)
 qed
 
-text \<open>power_noise_mass_exact: 対象量の厳密な閉形式を示す。\<close>
+text \<open>対象量の厳密な閉形式を示す。\<close>
 lemma power_noise_mass_exact:
   assumes noise_condition: "a < 2 * b"
   shows "power_learning_rate b k ^ 2 * real (power_population a k) =
@@ -5523,7 +5523,7 @@ proof -
     using K_nonzero denominator_factor square_power by (simp add: field_simps)
 qed
 
-text \<open>power_random_error_square: 誤差または状態の明示的な上界を与える。\<close>
+text \<open>誤差または状態の明示的な上界を与える。\<close>
 lemma power_random_error_square:
   assumes noise_condition: "a < 2 * b"
   shows "power_random_error a b k ^ 2 =
@@ -5557,7 +5557,7 @@ proof -
     by (simp add: field_simps; algebra)
 qed
 
-text \<open>power_random_error_square_tendsto_zero: 対応する量が段階極限で 0 へ収束することを示す。\<close>
+text \<open>対応する量が段階極限で 0 へ収束することを示す。\<close>
 lemma power_random_error_square_tendsto_zero:
   assumes noise_condition: "a < 2 * b"
   shows "((\<lambda>k. power_random_error a b k ^ 2) \<longlongrightarrow> 0) sequentially"
@@ -5637,7 +5637,7 @@ proof -
     by (rule tendsto_sandwich[OF lower_bound upper_bound tendsto_const upper_limit])
 qed
 
-text \<open>power_random_error_tendsto_zero: 対応する量が段階極限で 0 へ収束することを示す。\<close>
+text \<open>対応する量が段階極限で 0 へ収束することを示す。\<close>
 lemma power_random_error_tendsto_zero:
   assumes noise_condition: "a < 2 * b"
   shows "((\<lambda>k. power_random_error a b k) \<longlongrightarrow> 0) sequentially"
@@ -5656,7 +5656,7 @@ proof -
   show ?thesis using root_limit function_identity by simp
 qed
 
-text \<open>power_random_margin_exact: 更新後の分類マージンを評価する。\<close>
+text \<open>更新後の分類マージンを評価する。\<close>
 lemma power_random_margin_exact:
   assumes tail_below_population: "c < a"
   shows "random_order_lower_margin
@@ -5671,7 +5671,7 @@ lemma power_random_margin_exact:
   using power_log_odds_exact[OF tail_below_population, where k=k]
   by simp
 
-text \<open>power_random_margin_eventually_gt_one: 更新後の分類マージンを評価する。\<close>
+text \<open>更新後の分類マージンを評価する。\<close>
 lemma power_random_margin_eventually_gt_one:
   assumes noise_condition: "a < 2 * b"
     and rate_below_tail: "b < c"
@@ -5723,7 +5723,7 @@ proof -
   qed
 qed
 
-text \<open>power_random_benign_event: 冪スケーリングで正常なランダム順序となる事象を定める。\<close>
+text \<open>冪スケーリングで正常なランダム順序となる事象を定める。\<close>
 definition power_random_benign_event :: "nat \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> bool list set" where
   "power_random_benign_event a b c k = {xs.
     clean_test_risk (power_tail_ratio a c k)
@@ -5735,7 +5735,7 @@ definition power_random_benign_event :: "nat \<Rightarrow> nat \<Rightarrow> nat
         (real (power_anchor a c k) / real (power_population a k)) xs
         (power_population a k)) = 1 - power_tail_ratio a c k}"
 
-text \<open>power_law_inversion_eventually: 十分大きな段階で成立する評価を示す。\<close>
+text \<open>十分大きな段階で成立する評価を示す。\<close>
 lemma power_law_inversion_eventually:
   assumes noise_condition: "a < 2 * b"
     and rate_below_tail: "b < c"
@@ -5868,13 +5868,13 @@ proof -
   qed
 qed
 
-text \<open>power_random_benign_probability: 冪スケーリング族の対応する漸近性質を示す。\<close>
+text \<open>冪スケーリング族の対応する漸近性質を示す。\<close>
 definition power_random_benign_probability :: "nat \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> real" where
   "power_random_benign_probability a b c k = uniform_probability
     (binary_orders (power_anchor a c k) (power_population a k))
     (power_random_benign_event a b c k)"
 
-text \<open>power_random_benign_probability_tendsto_one: 対応する量が段階極限で 1 へ収束することを示す。\<close>
+text \<open>対応する量が段階極限で 1 へ収束することを示す。\<close>
 lemma power_random_benign_probability_tendsto_one:
   assumes noise_condition: "a < 2 * b"
     and rate_below_tail: "b < c"
@@ -5897,7 +5897,7 @@ proof -
     by (rule tendsto_sandwich[OF lower_bound upper_bound lower_limit tendsto_const])
 qed
 
-text \<open>power_attack_metric_limits: リスクと AUC の極限をまとめて示す。\<close>
+text \<open>リスクと AUC の極限をまとめて示す。\<close>
 lemma power_attack_metric_limits:
   assumes noise_condition: "a < 2 * b"
     and rate_below_tail: "b < c"
@@ -5937,7 +5937,7 @@ proof -
   show ?thesis by (intro tendsto_Pair risk_limit auc_limit)
 qed
 
-text \<open>power_law_order_only_inversion: 攻撃順序と正常順序の間で学習挙動が反転することを示す。\<close>
+text \<open>攻撃順序と正常順序の間で学習挙動が反転することを示す。\<close>
 theorem power_law_order_only_inversion:
   assumes noise_condition: "a < 2 * b"
     and rate_below_tail: "b < c"
@@ -5965,7 +5965,7 @@ primrec normed_additive_iteration ::
 | "normed_additive_iteration F e x (Suc k) =
     F (normed_additive_iteration F e x k) + e k"
 
-text \<open>normed_additive_iteration_error_bound: アンカーとテールの比率に関する恒等式または境界を示す。\<close>
+text \<open>アンカーとテールの比率に関する恒等式または境界を示す。\<close>
 theorem normed_additive_iteration_error_bound:
   fixes F :: "'a::real_normed_vector \<Rightarrow> 'a"
   assumes nonexpansive: "\<And>u v. norm (F u - F v) \<le> norm (u - v)"
@@ -5995,7 +5995,7 @@ next
   show ?case using step_bound Suc.IH by simp
 qed
 
-text \<open>binary_logistic_prefix_discrepancy_control: 対数またはロジット比をスケール量に結び付ける。\<close>
+text \<open>対数またはロジット比をスケール量に結び付ける。\<close>
 theorem binary_logistic_prefix_discrepancy_control:
   assumes N_positive: "0 < N"
     and sample_size: "n \<le> N"
@@ -6036,7 +6036,7 @@ proof -
     by linarith
 qed
 
-text \<open>binary_logistic_low_discrepancy_positive: 対象量が正であること、または正側の評価を示す。\<close>
+text \<open>対象量が正であること、または正側の評価を示す。\<close>
 corollary binary_logistic_low_discrepancy_positive:
   assumes N_positive: "0 < N"
     and sample_size: "n \<le> N"
@@ -6053,7 +6053,7 @@ corollary binary_logistic_low_discrepancy_positive:
       prefix_discrepancy] positive_margin
   by linarith
 
-text \<open>curriculum_momentum_effective_attack_eventually: 十分大きな段階で成立する評価を示す。\<close>
+text \<open>十分大きな段階で成立する評価を示す。\<close>
 lemma curriculum_momentum_effective_attack_eventually:
   fixes mu :: real
   assumes mu_nonnegative: "0 \<le> mu" and mu_less_one: "mu < 1"
@@ -6240,7 +6240,7 @@ proof -
   qed
 qed
 
-text \<open>curriculum_fixed_momentum_attack_eventually_negative: 十分大きな段階で成立する評価を示す。\<close>
+text \<open>十分大きな段階で成立する評価を示す。\<close>
 theorem curriculum_fixed_momentum_attack_eventually_negative:
   fixes mu :: real
   assumes mu_nonnegative: "0 \<le> mu" and mu_less_one: "mu < 1"
@@ -6345,7 +6345,7 @@ proof -
   qed
 qed
 
-text \<open>curriculum_fixed_momentum_attack_metrics_eventually: 十分大きな段階で成立する評価を示す。\<close>
+text \<open>十分大きな段階で成立する評価を示す。\<close>
 lemma curriculum_fixed_momentum_attack_metrics_eventually:
   fixes mu :: real
   assumes mu_nonnegative: "0 \<le> mu" and mu_less_one: "mu < 1"
@@ -6379,7 +6379,7 @@ proof -
   qed
 qed
 
-text \<open>curriculum_fixed_momentum_attack_metric_limits: リスクと AUC の極限をまとめて示す。\<close>
+text \<open>リスクと AUC の極限をまとめて示す。\<close>
 theorem curriculum_fixed_momentum_attack_metric_limits:
   fixes mu :: real
   assumes mu_nonnegative: "0 \<le> mu" and mu_less_one: "mu < 1"

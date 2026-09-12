@@ -1,9 +1,10 @@
-name: Deploy GitHub Pages
+name: Build and deploy Isabelle/HOL documentation
 
 on:
   push:
     branches: [master]
     paths:
+      - formalization/**
       - docs/**
       - .github/workflows/pages.yml
   workflow_dispatch:
@@ -18,14 +19,39 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  build-document:
     runs-on: ubuntu-latest
+    container:
+      image: makarius/isabelle:Isabelle2025-2_X11_Latex
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+
+      - name: Build Isabelle/HOL document
+        run: |
+          mkdir -p site
+          isabelle document -d formalization -O build/document Bad_Curriculum
+          cp build/document/document.pdf site/Bad_Curriculum.pdf
+          cp docs/index.html site/index.html
+
+      - name: Upload site input
+        uses: actions/upload-artifact@v4
+        with:
+          name: pages-site
+          path: site
+
+  deploy:
+    needs: build-document
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Download site input
+        uses: actions/download-artifact@v4
+        with:
+          name: pages-site
+          path: site
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
@@ -33,7 +59,7 @@ jobs:
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: docs
+          path: site
 
       - name: Deploy Pages
         id: deployment

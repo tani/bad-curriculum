@@ -1,5 +1,8 @@
 session "Bad_Curriculum" = "HOL-Probability" +
+  options [document = pdf]
   theories
     Order_Only_Inversion
     Finite_Population_Hoeffding
     Order_Only_Inversion_Extensions
+  document_files
+    "root.tex"
