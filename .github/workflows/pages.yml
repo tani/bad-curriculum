@@ -5,7 +5,6 @@ on:
     branches: [master]
     paths:
       - formalization/**
-      - docs/**
       - .github/workflows/pages.yml
   workflow_dispatch:
 
@@ -27,12 +26,12 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
-      - name: Build Isabelle/HOL document
+      - name: Build Isabelle/HOL HTML browser information
         run: |
-          mkdir -p site
-          /home/isabelle/Isabelle/bin/isabelle document -d formalization -O build/document Bad_Curriculum
-          cp build/document/document.pdf site/Bad_Curriculum.pdf
-          cp docs/index.html site/index.html
+          mkdir -p build/presentation site
+          /home/isabelle/Isabelle/bin/isabelle build -P build/presentation -D formalization -o browser_info Bad_Curriculum
+          cp -a build/presentation/. site/
+          cp -a build/presentation/Unsorted/Bad_Curriculum/. site/
 
       - name: Upload site input
         uses: actions/upload-artifact@v4
