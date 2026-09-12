@@ -74,16 +74,20 @@ layers:
 - uniform finite-population permutation concentration, finite-list empirical
   risk/AUC bridges, and a vanishing-tail family whose random-order success
   probability tends to one;
-- realizable two-coordinate dynamics, momentum transfer for fixed and varying
-  coefficients under explicit error conditions, and perturbation transfer in
-  real normed vector spaces.
+- realizable two-coordinate dynamics with explicit attack risk/AUC limits,
+  assumption-free attack failure for every fixed momentum coefficient
+  `0 <= mu < 1`, finite-iteration perturbation bounds in real normed vector
+  spaces, and deterministic prefix-discrepancy control for low-discrepancy
+  schedules.
 
 `order_only_inversion_complete_asymptotic` is unconditional: it combines the
-explicit scalar attack order, random-permutation event, realizable transfer, and
-the exact zero-momentum reference trajectory. The broader arbitrary fixed
-momentum theorem remains conditional on `0 <= mu < 1`. Separate definitions
-record linear realizability and the stronger bounded uniform-margin property,
-and `inversion_exponent_regime` exposes the admissible scaling inequalities.
+explicit scalar attack order, random-permutation event, realizable transfer and
+attack metric limits, and the exact zero-momentum reference trajectory. The
+integer power-law family supports `N = K^a`, tail size `K^c`, and learning rate
+`K^-b` throughout the region `a < 2b`, `b < c < a`; the anchor-tail
+specialization uses `c = a - 1`, including the concrete `(a,b) = (6,4)`
+corollary. Separate definitions record linear realizability and the stronger
+bounded uniform-margin property.
 Build the complete session with:
 
 ```bash

@@ -3882,6 +3882,174 @@ proof -
         [OF mu_less_one])
 qed
 
+lemma curriculum_explicit_realizable_attack_metrics_eventually:
+  shows "\<forall>\<^sub>F k in sequentially.
+    realizable_test_risk (curriculum_tail_ratio k)
+      (realizable_a_state (curriculum_learning_rate k)
+        (curriculum_realizable_scale k)
+        (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
+        (curriculum_population k))
+      (realizable_u_state (curriculum_learning_rate k)
+        (curriculum_realizable_scale k)
+        (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
+        (curriculum_population k)) = 1 - curriculum_tail_ratio k \<and>
+    realizable_test_auc (curriculum_tail_ratio k)
+      (realizable_a_state (curriculum_learning_rate k)
+        (curriculum_realizable_scale k)
+        (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
+        (curriculum_population k))
+      (realizable_u_state (curriculum_learning_rate k)
+        (curriculum_realizable_scale k)
+        (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
+        (curriculum_population k)) =
+      2 * curriculum_tail_ratio k - curriculum_tail_ratio k ^ 2"
+proof -
+  have eventual_error: "\<forall>\<^sub>F k in sequentially.
+      realizable_transfer_error (curriculum_learning_rate k)
+        (curriculum_realizable_scale k) (curriculum_population k) < 1"
+    by (rule curriculum_realizable_transfer_error_eventually_small) simp
+  note conditions = eventually_conj[OF curriculum_attack_margin_eventually
+      eventual_error]
+  show ?thesis
+  proof (rule eventually_mono[OF conditions])
+    fix k
+    assume condition:
+      "attack_state (curriculum_learning_rate k)
+          (curriculum_anchor_count k) (curriculum_tail_count k) < -1 \<and>
+       realizable_transfer_error (curriculum_learning_rate k)
+          (curriculum_realizable_scale k) (curriculum_population k) < 1"
+    let ?xs = "attack_order (curriculum_anchor_count k)
+      (curriculum_tail_count k)"
+    have count_sum: "curriculum_anchor_count k + curriculum_tail_count k =
+        curriculum_population k"
+      using curriculum_counts[of k] by simp
+    have reference:
+      "binary_logistic_state (curriculum_learning_rate k)
+        (real (curriculum_anchor_count k) / real (curriculum_population k))
+        ?xs (curriculum_population k) \<le> -1"
+      using binary_logistic_state_attack_order
+        [of "curriculum_learning_rate k"
+          "real (curriculum_anchor_count k) / real (curriculum_population k)"
+          "curriculum_anchor_count k" "curriculum_tail_count k"]
+        count_sum condition by simp
+    have scale_nonzero: "curriculum_realizable_scale k \<noteq> 0"
+      unfolding curriculum_realizable_scale_def
+      using curriculum_scale_at_least_four[of k] by simp
+    have u_positive: "0 < realizable_u_state (curriculum_learning_rate k)
+        (curriculum_realizable_scale k) ?xs (curriculum_population k)"
+      by (rule realizable_u_state_positive
+          [OF curriculum_learning_rate_positive scale_nonzero
+            curriculum_population_positive])
+    have dominance:
+      "realizable_a_state (curriculum_learning_rate k)
+          (curriculum_realizable_scale k) ?xs (curriculum_population k) <
+       - realizable_u_state (curriculum_learning_rate k)
+          (curriculum_realizable_scale k) ?xs (curriculum_population k)"
+      by (rule realizable_negative_dominance_transfer
+          [OF order_less_imp_le[OF curriculum_learning_rate_positive]
+            curriculum_learning_rate_at_most_four reference])
+        (use condition in simp)
+    show "realizable_test_risk (curriculum_tail_ratio k)
+        (realizable_a_state (curriculum_learning_rate k)
+          (curriculum_realizable_scale k) ?xs (curriculum_population k))
+        (realizable_u_state (curriculum_learning_rate k)
+          (curriculum_realizable_scale k) ?xs (curriculum_population k)) =
+          1 - curriculum_tail_ratio k \<and>
+      realizable_test_auc (curriculum_tail_ratio k)
+        (realizable_a_state (curriculum_learning_rate k)
+          (curriculum_realizable_scale k) ?xs (curriculum_population k))
+        (realizable_u_state (curriculum_learning_rate k)
+          (curriculum_realizable_scale k) ?xs (curriculum_population k)) =
+          2 * curriculum_tail_ratio k - curriculum_tail_ratio k ^ 2"
+    proof
+      show "realizable_test_risk (curriculum_tail_ratio k)
+          (realizable_a_state (curriculum_learning_rate k)
+            (curriculum_realizable_scale k) ?xs (curriculum_population k))
+          (realizable_u_state (curriculum_learning_rate k)
+            (curriculum_realizable_scale k) ?xs (curriculum_population k)) =
+            1 - curriculum_tail_ratio k"
+        by (rule realizable_test_risk_negative[OF u_positive dominance])
+      show "realizable_test_auc (curriculum_tail_ratio k)
+          (realizable_a_state (curriculum_learning_rate k)
+            (curriculum_realizable_scale k) ?xs (curriculum_population k))
+          (realizable_u_state (curriculum_learning_rate k)
+            (curriculum_realizable_scale k) ?xs (curriculum_population k)) =
+            2 * curriculum_tail_ratio k - curriculum_tail_ratio k ^ 2"
+        by (rule realizable_test_auc_attack[OF u_positive dominance])
+    qed
+  qed
+qed
+
+lemma curriculum_explicit_realizable_attack_metric_limits:
+  "((\<lambda>k.
+    (realizable_test_risk (curriculum_tail_ratio k)
+      (realizable_a_state (curriculum_learning_rate k)
+        (curriculum_realizable_scale k)
+        (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
+        (curriculum_population k))
+      (realizable_u_state (curriculum_learning_rate k)
+        (curriculum_realizable_scale k)
+        (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
+        (curriculum_population k)),
+     realizable_test_auc (curriculum_tail_ratio k)
+      (realizable_a_state (curriculum_learning_rate k)
+        (curriculum_realizable_scale k)
+        (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
+        (curriculum_population k))
+      (realizable_u_state (curriculum_learning_rate k)
+        (curriculum_realizable_scale k)
+        (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
+        (curriculum_population k)))) \<longlongrightarrow> (1, 0)) sequentially"
+proof (intro tendsto_Pair)
+  show "((\<lambda>k. realizable_test_risk (curriculum_tail_ratio k)
+      (realizable_a_state (curriculum_learning_rate k)
+        (curriculum_realizable_scale k)
+        (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
+        (curriculum_population k))
+      (realizable_u_state (curriculum_learning_rate k)
+        (curriculum_realizable_scale k)
+        (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
+        (curriculum_population k))) \<longlongrightarrow> 1) sequentially"
+  proof (rule Lim_transform_eventually[OF curriculum_clean_metric_limits(1)])
+    show "\<forall>\<^sub>F k in sequentially. 1 - curriculum_tail_ratio k =
+      realizable_test_risk (curriculum_tail_ratio k)
+        (realizable_a_state (curriculum_learning_rate k)
+          (curriculum_realizable_scale k)
+          (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
+          (curriculum_population k))
+        (realizable_u_state (curriculum_learning_rate k)
+          (curriculum_realizable_scale k)
+          (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
+          (curriculum_population k))"
+      using curriculum_explicit_realizable_attack_metrics_eventually
+      by eventually_elim simp
+  qed
+  show "((\<lambda>k. realizable_test_auc (curriculum_tail_ratio k)
+      (realizable_a_state (curriculum_learning_rate k)
+        (curriculum_realizable_scale k)
+        (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
+        (curriculum_population k))
+      (realizable_u_state (curriculum_learning_rate k)
+        (curriculum_realizable_scale k)
+        (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
+        (curriculum_population k))) \<longlongrightarrow> 0) sequentially"
+  proof (rule Lim_transform_eventually[OF curriculum_clean_metric_limits(3)])
+    show "\<forall>\<^sub>F k in sequentially.
+      2 * curriculum_tail_ratio k - curriculum_tail_ratio k ^ 2 =
+      realizable_test_auc (curriculum_tail_ratio k)
+        (realizable_a_state (curriculum_learning_rate k)
+          (curriculum_realizable_scale k)
+          (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
+          (curriculum_population k))
+        (realizable_u_state (curriculum_learning_rate k)
+          (curriculum_realizable_scale k)
+          (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
+          (curriculum_population k))"
+      using curriculum_explicit_realizable_attack_metrics_eventually
+      by eventually_elim simp
+  qed
+qed
+
 theorem order_only_inversion_complete_asymptotic:
   shows "(curriculum_tail_ratio \<longlongrightarrow> 0) sequentially"
     and "(curriculum_confidence \<longlongrightarrow> 0) sequentially"
@@ -3898,6 +4066,25 @@ theorem order_only_inversion_complete_asymptotic:
        clean_test_auc (curriculum_tail_ratio k)
         (binary_logistic_state (curriculum_learning_rate k)
           (real (curriculum_anchor_count k) / real (curriculum_population k))
+          (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
+          (curriculum_population k)))) \<longlongrightarrow> (1, 0)) sequentially"
+    and "((\<lambda>k.
+      (realizable_test_risk (curriculum_tail_ratio k)
+        (realizable_a_state (curriculum_learning_rate k)
+          (curriculum_realizable_scale k)
+          (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
+          (curriculum_population k))
+        (realizable_u_state (curriculum_learning_rate k)
+          (curriculum_realizable_scale k)
+          (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
+          (curriculum_population k)),
+       realizable_test_auc (curriculum_tail_ratio k)
+        (realizable_a_state (curriculum_learning_rate k)
+          (curriculum_realizable_scale k)
+          (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
+          (curriculum_population k))
+        (realizable_u_state (curriculum_learning_rate k)
+          (curriculum_realizable_scale k)
           (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
           (curriculum_population k)))) \<longlongrightarrow> (1, 0)) sequentially"
     and "\<And>k xs q. momentum_w_state (curriculum_learning_rate k) 0 xs
@@ -3996,6 +4183,26 @@ proof -
           using state_eq by simp
       qed
   qed
+  show "((\<lambda>k.
+      (realizable_test_risk (curriculum_tail_ratio k)
+        (realizable_a_state (curriculum_learning_rate k)
+          (curriculum_realizable_scale k)
+          (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
+          (curriculum_population k))
+        (realizable_u_state (curriculum_learning_rate k)
+          (curriculum_realizable_scale k)
+          (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
+          (curriculum_population k)),
+       realizable_test_auc (curriculum_tail_ratio k)
+        (realizable_a_state (curriculum_learning_rate k)
+          (curriculum_realizable_scale k)
+          (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
+          (curriculum_population k))
+        (realizable_u_state (curriculum_learning_rate k)
+          (curriculum_realizable_scale k)
+          (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
+          (curriculum_population k)))) \<longlongrightarrow> (1, 0)) sequentially"
+    by (rule curriculum_explicit_realizable_attack_metric_limits)
   show "\<And>k xs q. momentum_w_state (curriculum_learning_rate k) 0 xs
       (curriculum_population k) =
       binary_logistic_state (curriculum_learning_rate k) q xs
@@ -4072,6 +4279,557 @@ proof -
   have triangle: "norm ((F x - F y) + e) \<le> norm (F x - F y) + norm e"
     by (rule norm_triangle_ineq)
   show ?thesis unfolding identity using triangle nonexpansive by linarith
+qed
+
+section \<open>Integer power-law families\<close>
+
+definition power_population :: "nat \<Rightarrow> nat \<Rightarrow> nat" where
+  "power_population a k = curriculum_scale k ^ a"
+
+definition power_tail :: "nat \<Rightarrow> nat \<Rightarrow> nat" where
+  "power_tail c k = curriculum_scale k ^ c"
+
+definition power_learning_rate :: "nat \<Rightarrow> nat \<Rightarrow> real" where
+  "power_learning_rate b k = 1 / real (curriculum_scale k) ^ b"
+
+lemma inverse_curriculum_power_tendsto_zero:
+  assumes exponent_positive: "0 < d"
+  shows "((\<lambda>k. 1 / real (curriculum_scale k) ^ d) \<longlongrightarrow> 0) sequentially"
+proof -
+  have base: "((\<lambda>k. 1 / real (curriculum_scale k)) \<longlongrightarrow> 0) sequentially"
+    using curriculum_tail_ratio_tendsto_zero
+    by (simp add: curriculum_tail_ratio_exact)
+  have powered:
+      "((\<lambda>k. (1 / real (curriculum_scale k)) ^ d) \<longlongrightarrow> 0 ^ d) sequentially"
+    by (rule tendsto_power[OF base])
+  have zero_power: "(0::real) ^ d = 0"
+    using exponent_positive by simp
+  have powered_zero:
+      "((\<lambda>k. (1 / real (curriculum_scale k)) ^ d) \<longlongrightarrow> 0) sequentially"
+    using powered unfolding zero_power .
+  have function_identity:
+      "(\<lambda>k. 1 / real (curriculum_scale k) ^ d) =
+       (\<lambda>k. (1 / real (curriculum_scale k)) ^ d)"
+    by (rule ext) (simp add: power_divide)
+  show ?thesis
+    unfolding function_identity
+    by (fact powered_zero)
+qed
+
+theorem power_law_scaling:
+  assumes noise_condition: "a < 2 * b"
+    and takeover_condition: "b < c"
+    and vanishing_tail_condition: "c < a"
+  shows "((\<lambda>k. real (power_tail c k) / real (power_population a k))
+      \<longlongrightarrow> 0) sequentially"
+    and "((\<lambda>k. (power_learning_rate b k)^2 *
+      real (power_population a k)) \<longlongrightarrow> 0) sequentially"
+    and "((\<lambda>k. 1 / (power_learning_rate b k * real (power_tail c k)))
+      \<longlongrightarrow> 0) sequentially"
+proof -
+  have ratio_identity:
+    "1 / x ^ (n - m) = x ^ m / x ^ n"
+    if x_nonzero: "x \<noteq> (0::real)" and exponent_order: "m \<le> n"
+    for x m n
+  proof -
+    have exponent_sum: "m + (n - m) = n"
+      using exponent_order by simp
+    have product: "x ^ m * x ^ (n - m) = x ^ n"
+    proof -
+      have "x ^ m * x ^ (n - m) = x ^ (m + (n - m))"
+        by (rule power_add[symmetric])
+      also have "\<dots> = x ^ n"
+        unfolding exponent_sum ..
+      finally show ?thesis .
+    qed
+    show ?thesis
+      using x_nonzero product by (simp add: field_simps)
+  qed
+  have ac: "0 < a - c" using vanishing_tail_condition by simp
+  have ba: "0 < 2 * b - a" using noise_condition by simp
+  have cb: "0 < c - b" using takeover_condition by simp
+  show "((\<lambda>k. real (power_tail c k) / real (power_population a k))
+      \<longlongrightarrow> 0) sequentially"
+  proof (rule Lim_transform_eventually[OF inverse_curriculum_power_tendsto_zero[OF ac]])
+    show "\<forall>\<^sub>F k in sequentially.
+      1 / real (curriculum_scale k) ^ (a - c) =
+      real (power_tail c k) / real (power_population a k)"
+    proof (rule always_eventually, rule allI)
+      fix k
+      have scale_nonzero: "real (curriculum_scale k) \<noteq> 0"
+        using curriculum_scale_at_least_four[of k] by simp
+      show "1 / real (curriculum_scale k) ^ (a - c) =
+        real (power_tail c k) / real (power_population a k)"
+        unfolding power_tail_def power_population_def of_nat_power
+        by (rule ratio_identity[OF scale_nonzero])
+          (use vanishing_tail_condition in simp)
+    qed
+  qed
+  show "((\<lambda>k. (power_learning_rate b k)^2 *
+      real (power_population a k)) \<longlongrightarrow> 0) sequentially"
+  proof (rule Lim_transform_eventually[OF inverse_curriculum_power_tendsto_zero[OF ba]])
+    show "\<forall>\<^sub>F k in sequentially.
+      1 / real (curriculum_scale k) ^ (2 * b - a) =
+      (power_learning_rate b k)^2 * real (power_population a k)"
+    proof (rule always_eventually, rule allI)
+      fix k
+      let ?K = "real (curriculum_scale k)"
+      have scale_nonzero: "?K \<noteq> 0"
+        using curriculum_scale_at_least_four[of k] by simp
+      have ratio: "1 / ?K ^ (2 * b - a) = ?K ^ a / ?K ^ (2 * b)"
+        by (rule ratio_identity[OF scale_nonzero])
+          (use noise_condition in simp)
+      have square_power: "(?K ^ b)^2 = ?K ^ (2 * b)"
+      proof -
+        have "(?K ^ b)^2 = ?K ^ (b * 2)"
+          by (rule power_mult[symmetric])
+        also have "\<dots> = ?K ^ (2 * b)"
+          by (simp add: mult.commute)
+        finally show ?thesis .
+      qed
+      show "1 / ?K ^ (2 * b - a) =
+        (power_learning_rate b k)^2 * real (power_population a k)"
+        unfolding power_learning_rate_def power_population_def of_nat_power
+        using ratio square_power scale_nonzero by (simp add: field_simps)
+    qed
+  qed
+  show "((\<lambda>k. 1 / (power_learning_rate b k * real (power_tail c k)))
+      \<longlongrightarrow> 0) sequentially"
+  proof (rule Lim_transform_eventually[OF inverse_curriculum_power_tendsto_zero[OF cb]])
+    show "\<forall>\<^sub>F k in sequentially.
+      1 / real (curriculum_scale k) ^ (c - b) =
+      1 / (power_learning_rate b k * real (power_tail c k))"
+    proof (rule always_eventually, rule allI)
+      fix k
+      let ?K = "real (curriculum_scale k)"
+      have scale_nonzero: "?K \<noteq> 0"
+        using curriculum_scale_at_least_four[of k] by simp
+      have ratio: "1 / ?K ^ (c - b) = ?K ^ b / ?K ^ c"
+        by (rule ratio_identity[OF scale_nonzero])
+          (use takeover_condition in simp)
+      show "1 / ?K ^ (c - b) =
+        1 / (power_learning_rate b k * real (power_tail c k))"
+        unfolding power_learning_rate_def power_tail_def of_nat_power
+        using ratio scale_nonzero by (simp add: field_simps)
+    qed
+  qed
+qed
+theorem power_law_anchor_tail_scaling:
+  assumes noise_condition: "a < 2 * b"
+    and takeover_condition: "b + 1 < a"
+  shows "((\<lambda>k. real (power_tail (a - 1) k) / real (power_population a k))
+      \<longlongrightarrow> 0) sequentially"
+    and "((\<lambda>k. (power_learning_rate b k)^2 *
+      real (power_population a k)) \<longlongrightarrow> 0) sequentially"
+    and "((\<lambda>k. 1 / (power_learning_rate b k * real (power_tail (a - 1) k)))
+      \<longlongrightarrow> 0) sequentially"
+proof -
+  have tail_below_population: "a - 1 < a"
+    using takeover_condition by simp
+  have rate_below_tail: "b < a - 1"
+    using takeover_condition by simp
+  show "((\<lambda>k. real (power_tail (a - 1) k) / real (power_population a k))
+      \<longlongrightarrow> 0) sequentially"
+    by (rule power_law_scaling(1)[OF noise_condition rate_below_tail
+          tail_below_population])
+  show "((\<lambda>k. (power_learning_rate b k)^2 *
+      real (power_population a k)) \<longlongrightarrow> 0) sequentially"
+    by (rule power_law_scaling(2)[OF noise_condition rate_below_tail
+          tail_below_population])
+  show "((\<lambda>k. 1 / (power_learning_rate b k * real (power_tail (a - 1) k)))
+      \<longlongrightarrow> 0) sequentially"
+    by (rule power_law_scaling(3)[OF noise_condition rate_below_tail
+          tail_below_population])
+qed
+
+corollary power_law_6_4_scaling:
+  "((\<lambda>k. real (power_tail 5 k) / real (power_population 6 k))
+      \<longlongrightarrow> 0) sequentially"
+  "((\<lambda>k. (power_learning_rate 4 k)^2 *
+      real (power_population 6 k)) \<longlongrightarrow> 0) sequentially"
+  "((\<lambda>k. 1 / (power_learning_rate 4 k * real (power_tail 5 k)))
+      \<longlongrightarrow> 0) sequentially"
+  using power_law_anchor_tail_scaling[of 6 4] by simp_all
+
+primrec normed_additive_iteration ::
+    "('a::real_normed_vector \<Rightarrow> 'a) \<Rightarrow> (nat \<Rightarrow> 'a) \<Rightarrow> 'a \<Rightarrow> nat \<Rightarrow> 'a" where
+  "normed_additive_iteration F e x 0 = x"
+| "normed_additive_iteration F e x (Suc k) =
+    F (normed_additive_iteration F e x k) + e k"
+
+theorem normed_additive_iteration_error_bound:
+  fixes F :: "'a::real_normed_vector \<Rightarrow> 'a"
+  assumes nonexpansive: "\<And>u v. norm (F u - F v) \<le> norm (u - v)"
+  shows "norm (normed_additive_iteration F e x N - (F ^^ N) x) \<le>
+    (\<Sum>i<N. norm (e i))"
+proof (induction N)
+  case 0
+  show ?case by simp
+next
+  case (Suc k)
+  let ?actual = "normed_additive_iteration F e x k"
+  let ?ideal = "(F ^^ k) x"
+  have iterate_identity:
+    "normed_additive_iteration F e x (Suc k) - (F ^^ Suc k) x =
+      (F ?actual - F ?ideal) + e k"
+    by (simp add: funpow_Suc_right algebra_simps)
+  have triangle:
+    "norm (normed_additive_iteration F e x (Suc k) - (F ^^ Suc k) x) \<le>
+      norm (F ?actual - F ?ideal) + norm (e k)"
+    unfolding iterate_identity by (rule norm_triangle_ineq)
+  have dynamics_bound: "norm (F ?actual - F ?ideal) \<le> norm (?actual - ?ideal)"
+    by (rule nonexpansive)
+  have step_bound:
+    "norm (normed_additive_iteration F e x (Suc k) - (F ^^ Suc k) x) \<le>
+      norm (?actual - ?ideal) + norm (e k)"
+    using triangle dynamics_bound by linarith
+  show ?case using step_bound Suc.IH by simp
+qed
+
+theorem binary_logistic_prefix_discrepancy_control:
+  assumes N_positive: "0 < N"
+    and sample_size: "n \<le> N"
+    and xs_order: "xs \<in> binary_orders n N"
+    and eta_nonnegative: "0 \<le> eta"
+    and eta_at_most_four: "eta \<le> 4"
+    and prefix_discrepancy: "\<And>j. j \<le> N \<Longrightarrow>
+      abs (prefix_sum (binary_innovation (real n / real N) xs) j) \<le> D"
+  shows "abs (binary_logistic_state eta (real n / real N) xs N -
+      mean_logistic_state eta (real n / real N) N) \<le> eta * D"
+    and "mean_logistic_state eta (real n / real N) N - eta * D \<le>
+      binary_logistic_state eta (real n / real N) xs N"
+proof -
+  have displacement:
+    "min e 0 \<le> mean_logistic_step eta (real n / real N) (y + e) -
+        mean_logistic_step eta (real n / real N) y \<and>
+      mean_logistic_step eta (real n / real N) (y + e) -
+        mean_logistic_step eta (real n / real N) y \<le> max e 0"
+    for y e
+    by (rule mean_logistic_step_displacement[OF eta_nonnegative eta_at_most_four])
+  have total_zero:
+    "prefix_sum (binary_innovation (real n / real N) xs) N = 0"
+    by (rule binary_innovation_total_zero[OF N_positive sample_size xs_order])
+  have absolute_bound:
+    "abs (binary_logistic_state eta (real n / real N) xs N -
+      mean_logistic_state eta (real n / real N) N) \<le> eta * D"
+    unfolding binary_logistic_state_def mean_logistic_state_def
+    by (rule prefix_controlled_perturbation[OF eta_nonnegative displacement
+          prefix_discrepancy total_zero])
+  show "abs (binary_logistic_state eta (real n / real N) xs N -
+      mean_logistic_state eta (real n / real N) N) \<le> eta * D"
+    by (fact absolute_bound)
+  show "mean_logistic_state eta (real n / real N) N - eta * D \<le>
+      binary_logistic_state eta (real n / real N) xs N"
+    using absolute_bound abs_ge_minus_self[of
+      "binary_logistic_state eta (real n / real N) xs N -
+       mean_logistic_state eta (real n / real N) N"]
+    by linarith
+qed
+
+corollary binary_logistic_low_discrepancy_positive:
+  assumes N_positive: "0 < N"
+    and sample_size: "n \<le> N"
+    and xs_order: "xs \<in> binary_orders n N"
+    and eta_nonnegative: "0 \<le> eta"
+    and eta_at_most_four: "eta \<le> 4"
+    and prefix_discrepancy: "\<And>j. j \<le> N \<Longrightarrow>
+      abs (prefix_sum (binary_innovation (real n / real N) xs) j) \<le> D"
+    and positive_margin:
+      "eta * D < mean_logistic_state eta (real n / real N) N"
+  shows "0 < binary_logistic_state eta (real n / real N) xs N"
+  using binary_logistic_prefix_discrepancy_control(2)
+    [OF N_positive sample_size xs_order eta_nonnegative eta_at_most_four
+      prefix_discrepancy] positive_margin
+  by linarith
+
+lemma curriculum_momentum_effective_attack_eventually:
+  fixes mu :: real
+  assumes mu_nonnegative: "0 \<le> mu" and mu_less_one: "mu < 1"
+  shows "\<forall>\<^sub>F k in sequentially.
+    attack_state (momentum_effective_step (curriculum_learning_rate k) mu)
+      (curriculum_anchor_count k) (curriculum_tail_count k) < -1"
+proof -
+  let ?d = "1 - mu"
+  let ?C = "(exp (1::real) - 1) / ?d"
+  let ?K = "\<lambda>k. real (curriculum_scale k)"
+  let ?h = "\<lambda>k. momentum_effective_step (curriculum_learning_rate k) mu"
+  let ?A = "\<lambda>k. ln (1 + real (curriculum_anchor_count k) *
+    (exp (?h k) - 1))"
+  have d_positive: "0 < ?d" using mu_less_one by linarith
+  have C_nonnegative: "0 \<le> ?C"
+    using d_positive by (intro divide_nonneg_nonneg) simp_all
+  have effective_limit: "(?h \<longlongrightarrow> 0) sequentially"
+    by (rule curriculum_momentum_effective_step_tendsto_zero[OF mu_less_one])
+  have effective_less: "\<forall>\<^sub>F k in sequentially. ?h k < 1"
+    using order_tendstoD(2)[OF effective_limit, of 1] by simp
+  have effective_small: "\<forall>\<^sub>F k in sequentially. ?h k \<le> 1"
+  proof (rule eventually_mono[OF effective_less])
+    fix k assume "?h k < 1"
+    then show "?h k \<le> 1" by linarith
+  qed
+  have upper_bound: "\<forall>\<^sub>F k in sequentially.
+      ?A k / ?K k \<le> (ln (1 + ?C) + 2 * ln (?K k)) / ?K k"
+  proof (rule eventually_mono[OF effective_small])
+    fix k assume h_small: "?h k \<le> 1"
+    have K_positive: "0 < ?K k"
+      using curriculum_scale_at_least_four[of k] by simp
+    have K_square_one: "1 \<le> (?K k)^2"
+      using curriculum_scale_at_least_four[of k] by simp
+    have h_positive: "0 < ?h k"
+      unfolding momentum_effective_step_def
+      using curriculum_learning_rate_positive[of k] d_positive
+      by (intro divide_pos_pos)
+    have secant: "exp (?h k) - 1 \<le> ?h k * (exp 1 - 1)"
+    proof -
+      have "exp ((?h k) * 1) \<le> 1 + (?h k) * (exp 1 - 1)"
+        by (rule exp_secant) (use h_positive h_small in linarith)+
+      then show ?thesis by simp
+    qed
+    have anchor_le_population:
+      "curriculum_anchor_count k \<le> curriculum_population k"
+      using curriculum_counts[of k] by linarith
+    have exponential_nonnegative: "0 \<le> exp (?h k) - 1"
+      using h_positive by simp
+    have scaled_anchor:
+      "real (curriculum_anchor_count k) * (exp (?h k) - 1) \<le>
+        (?K k)^2 * ?C"
+    proof -
+      have "real (curriculum_anchor_count k) * (exp (?h k) - 1) \<le>
+          real (curriculum_population k) * (?h k * (exp 1 - 1))"
+        using anchor_le_population secant exponential_nonnegative
+        by (meson mult_mono of_nat_0_le_iff of_nat_mono)
+      also have "\<dots> = (?K k)^2 * ?C"
+        unfolding momentum_effective_step_def
+        using curriculum_population_learning_mass[of k] d_positive
+        by (simp add: field_simps; algebra)
+      finally show ?thesis .
+    qed
+    have expanded_upper:
+      "(1 + ?C) * (?K k)^2 = (?K k)^2 + ?C * (?K k)^2"
+      by algebra
+    have scaled_anchor_commuted:
+      "real (curriculum_anchor_count k) * (exp (?h k) - 1) \<le>
+        ?C * (?K k)^2"
+      using scaled_anchor by (simp add: mult.commute)
+    have argument_upper:
+      "1 + real (curriculum_anchor_count k) * (exp (?h k) - 1) \<le>
+        (1 + ?C) * (?K k)^2"
+      using scaled_anchor_commuted K_square_one expanded_upper by linarith
+    have product_nonnegative:
+      "0 \<le> real (curriculum_anchor_count k) * (exp (?h k) - 1)"
+      by (rule mult_nonneg_nonneg) (use exponential_nonnegative in simp_all)
+    have argument_positive:
+      "0 < 1 + real (curriculum_anchor_count k) * (exp (?h k) - 1)"
+      using product_nonnegative by linarith
+    have log_upper: "?A k \<le> ln ((1 + ?C) * (?K k)^2)"
+      by (rule ln_mono[OF argument_upper argument_positive])
+    have coefficient_positive: "0 < 1 + ?C" using C_nonnegative by linarith
+    have log_identity:
+      "ln ((1 + ?C) * (?K k)^2) = ln (1 + ?C) + 2 * ln (?K k)"
+      using coefficient_positive K_positive by (simp add: ln_mult ln_realpow)
+    show "?A k / ?K k \<le> (ln (1 + ?C) + 2 * ln (?K k)) / ?K k"
+      using log_upper log_identity K_positive by (simp add: divide_right_mono)
+  qed
+  have lower_bound: "\<forall>\<^sub>F k in sequentially. 0 \<le> ?A k / ?K k"
+  proof (intro always_eventually allI)
+    fix k
+    have h_positive: "0 < ?h k"
+      unfolding momentum_effective_step_def
+      using curriculum_learning_rate_positive[of k] d_positive
+      by (intro divide_pos_pos)
+    have K_positive: "0 < ?K k"
+      using curriculum_scale_at_least_four[of k] by simp
+    have "0 \<le> ?A k" using h_positive by simp
+    then show "0 \<le> ?A k / ?K k"
+      using K_positive by (intro divide_nonneg_nonneg) simp_all
+  qed
+  have inverse_limit: "((\<lambda>k. 1 / ?K k) \<longlongrightarrow> 0) sequentially"
+    using curriculum_tail_ratio_tendsto_zero
+    by (simp add: curriculum_tail_ratio_exact)
+  have constant_limit: "((\<lambda>k. ln (1 + ?C) / ?K k) \<longlongrightarrow> 0) sequentially"
+    using tendsto_mult[OF tendsto_const inverse_limit, of "ln (1 + ?C)"]
+    by (simp add: field_class.field_divide_inverse)
+  have twice_log_limit: "((\<lambda>k. 2 * (ln (?K k) / ?K k)) \<longlongrightarrow> 0) sequentially"
+    using tendsto_mult[OF tendsto_const curriculum_log_scale_over_scale_tendsto_zero, of 2]
+    by simp
+  have upper_limit: "((\<lambda>k. (ln (1 + ?C) + 2 * ln (?K k)) / ?K k)
+      \<longlongrightarrow> 0) sequentially"
+  proof -
+    have sum_limit: "((\<lambda>k. ln (1 + ?C) / ?K k +
+        2 * (ln (?K k) / ?K k)) \<longlongrightarrow> 0) sequentially"
+      using tendsto_add[OF constant_limit twice_log_limit] by simp
+    show ?thesis using sum_limit
+      by (simp add: field_class.field_divide_inverse algebra_simps)
+  qed
+  have normalized_limit: "((\<lambda>k. ?A k / ?K k) \<longlongrightarrow> 0) sequentially"
+    by (rule tendsto_sandwich[OF lower_bound upper_bound tendsto_const upper_limit])
+  have sum_limit: "((\<lambda>k. ?A k / ?K k + 1 / ?K k) \<longlongrightarrow> 0) sequentially"
+    using tendsto_add[OF normalized_limit inverse_limit] by simp
+  have target_denominator_positive: "0 < ?d * (1 + exp (1::real))"
+    by (rule mult_pos_pos) (use d_positive exp_gt_zero[of "1::real"] in linarith)+
+  have target_positive: "0 < 1 / (?d * (1 + exp (1::real)))"
+    by (rule divide_pos_pos) (use target_denominator_positive in simp_all)
+  have eventual_normalized: "\<forall>\<^sub>F k in sequentially.
+      ?A k / ?K k + 1 / ?K k < 1 / (?d * (1 + exp 1))"
+    using order_tendstoD(2)[OF sum_limit, of "1 / (?d * (1 + exp 1))"]
+      target_positive by simp
+  show ?thesis
+  proof (rule eventually_mono[OF eventual_normalized])
+    fix k assume normalized: "?A k / ?K k + 1 / ?K k <
+      1 / (?d * (1 + exp 1))"
+    have K_positive: "0 < ?K k"
+      using curriculum_scale_at_least_four[of k] by simp
+    have normalized_identity:
+      "?A k / ?K k + 1 / ?K k = (?A k + 1) / ?K k"
+      unfolding field_class.field_divide_inverse by algebra
+    have first_takeover:
+      "?A k + 1 < ?K k / (?d * (1 + exp 1))"
+      using normalized normalized_identity K_positive
+      by (simp add: pos_divide_less_eq)
+    have effective_tail_identity:
+      "?h k * real (curriculum_tail_count k) = ?K k / ?d"
+    proof -
+      have "?h k * real (curriculum_tail_count k) =
+          (curriculum_learning_rate k * real (curriculum_tail_count k)) *
+            inverse ?d"
+        unfolding momentum_effective_step_def field_class.field_divide_inverse
+        by algebra
+      also have "\<dots> = ?K k * inverse ?d"
+        using curriculum_effective_tail_mass[of k] by simp
+      also have "\<dots> = ?K k / ?d"
+        unfolding field_class.field_divide_inverse ..
+      finally show ?thesis .
+    qed
+    have denominator_nonzero: "1 + exp (1::real) \<noteq> 0"
+      using exp_gt_zero[of "1::real"] by linarith
+    have target_identity:
+      "(?K k / ?d) / (1 + exp 1) = ?K k / (?d * (1 + exp 1))"
+      using d_positive denominator_nonzero by (simp add: field_simps)
+    have takeover: "?A k + 1 <
+        ?h k * real (curriculum_tail_count k) / (1 + exp 1)"
+      using first_takeover effective_tail_identity target_identity by simp
+    have h_positive: "0 < ?h k"
+      unfolding momentum_effective_step_def
+      using curriculum_learning_rate_positive[of k] d_positive
+      by (intro divide_pos_pos)
+    have anchor_bound: "anchor_state (?h k) (curriculum_anchor_count k) \<le> ?A k"
+      by (rule anchor_log_bound) (use h_positive in linarith)
+    have decrement_identity:
+      "real (curriculum_tail_count k) * (?h k * (1 / (1 + exp 1))) =
+        ?h k * real (curriculum_tail_count k) / (1 + exp 1)"
+      unfolding field_class.field_divide_inverse by algebra
+    have takeover_form: "?A k - real (curriculum_tail_count k) *
+        (?h k * (1 / (1 + exp 1))) < -1"
+      using takeover decrement_identity by linarith
+    show "attack_state (?h k) (curriculum_anchor_count k)
+        (curriculum_tail_count k) < -1"
+      by (rule logarithmic_anchor_bound_implies_inversion
+        [OF h_positive anchor_bound takeover_form])
+  qed
+qed
+
+theorem curriculum_fixed_momentum_attack_eventually_negative:
+  fixes mu :: real
+  assumes mu_nonnegative: "0 \<le> mu" and mu_less_one: "mu < 1"
+  shows "\<forall>\<^sub>F k in sequentially.
+    momentum_w_state (curriculum_learning_rate k) mu
+      (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
+      (curriculum_population k) < 0"
+proof -
+  have effective_limit:
+    "((\<lambda>k. momentum_effective_step (curriculum_learning_rate k) mu)
+      \<longlongrightarrow> 0) sequentially"
+    by (rule curriculum_momentum_effective_step_tendsto_zero[OF mu_less_one])
+  have effective_small: "\<forall>\<^sub>F k in sequentially.
+      momentum_effective_step (curriculum_learning_rate k) mu \<le> 4"
+  proof -
+    have strict: "\<forall>\<^sub>F k in sequentially.
+        momentum_effective_step (curriculum_learning_rate k) mu < 4"
+      using order_tendstoD(2)[OF effective_limit, of 4] by simp
+    show ?thesis
+    proof (rule eventually_mono[OF strict])
+      fix k assume "momentum_effective_step (curriculum_learning_rate k) mu < 4"
+      then show "momentum_effective_step (curriculum_learning_rate k) mu \<le> 4"
+        by linarith
+    qed
+  qed
+  have error_small: "\<forall>\<^sub>F k in sequentially.
+      momentum_transfer_error (curriculum_learning_rate k) mu
+        (curriculum_population k) < 1"
+    by (rule curriculum_momentum_transfer_error_eventually_small_general
+      [OF mu_less_one]) simp
+  have attack_eventual: "\<forall>\<^sub>F k in sequentially. attack_state
+      (momentum_effective_step (curriculum_learning_rate k) mu)
+      (curriculum_anchor_count k) (curriculum_tail_count k) < -1"
+    by (rule curriculum_momentum_effective_attack_eventually
+      [OF mu_nonnegative mu_less_one])
+  have small_and_error: "\<forall>\<^sub>F k in sequentially.
+      momentum_effective_step (curriculum_learning_rate k) mu \<le> 4 \<and>
+      momentum_transfer_error (curriculum_learning_rate k) mu
+        (curriculum_population k) < 1"
+    by (rule eventually_conj[OF effective_small error_small])
+  have eventual_conditions: "\<forall>\<^sub>F k in sequentially.
+      attack_state (momentum_effective_step (curriculum_learning_rate k) mu)
+        (curriculum_anchor_count k) (curriculum_tail_count k) < -1 \<and>
+      momentum_effective_step (curriculum_learning_rate k) mu \<le> 4 \<and>
+      momentum_transfer_error (curriculum_learning_rate k) mu
+        (curriculum_population k) < 1"
+    by (rule eventually_conj[OF attack_eventual small_and_error])
+  show ?thesis
+  proof (rule eventually_mono[OF eventual_conditions])
+    fix k
+    assume conditions: "attack_state
+        (momentum_effective_step (curriculum_learning_rate k) mu)
+        (curriculum_anchor_count k) (curriculum_tail_count k) < -1 \<and>
+      momentum_effective_step (curriculum_learning_rate k) mu \<le> 4 \<and>
+      momentum_transfer_error (curriculum_learning_rate k) mu
+        (curriculum_population k) < 1"
+    have counts_reordered:
+      "curriculum_anchor_count k + curriculum_tail_count k =
+        curriculum_population k"
+      using curriculum_counts[of k] by (simp add: add.commute)
+    have exact: "binary_logistic_state
+        (momentum_effective_step (curriculum_learning_rate k) mu)
+        (real (curriculum_anchor_count k) / real (curriculum_population k))
+        (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
+        (curriculum_anchor_count k + curriculum_tail_count k) =
+      attack_state (momentum_effective_step (curriculum_learning_rate k) mu)
+        (curriculum_anchor_count k) (curriculum_tail_count k)"
+      by (rule binary_logistic_state_attack_order)
+    have exact_population: "binary_logistic_state
+        (momentum_effective_step (curriculum_learning_rate k) mu)
+        (real (curriculum_anchor_count k) / real (curriculum_population k))
+        (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
+        (curriculum_population k) =
+      attack_state (momentum_effective_step (curriculum_learning_rate k) mu)
+        (curriculum_anchor_count k) (curriculum_tail_count k)"
+      using exact counts_reordered by simp
+    have attack_upper: "attack_state
+        (momentum_effective_step (curriculum_learning_rate k) mu)
+        (curriculum_anchor_count k) (curriculum_tail_count k) \<le> -1"
+      using conditions by linarith
+    have attack_reference: "binary_logistic_state
+        (momentum_effective_step (curriculum_learning_rate k) mu)
+        (real (curriculum_anchor_count k) / real (curriculum_population k))
+        (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
+        (curriculum_population k) \<le> -1"
+      using exact_population attack_upper by simp
+    have effective_bound:
+      "momentum_effective_step (curriculum_learning_rate k) mu \<le> 4"
+      using conditions by simp
+    have error_bound: "momentum_transfer_error (curriculum_learning_rate k) mu
+        (curriculum_population k) < 1"
+      using conditions by simp
+    have rate_nonnegative: "0 \<le> curriculum_learning_rate k"
+      using curriculum_learning_rate_positive[of k] by linarith
+    show "momentum_w_state (curriculum_learning_rate k) mu
+        (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
+        (curriculum_population k) < 0"
+      by (rule momentum_negative_margin_transfer
+        [where q="real (curriculum_anchor_count k) / real (curriculum_population k)"
+          and G=1, OF rate_nonnegative mu_nonnegative mu_less_one
+          effective_bound attack_reference error_bound])
+  qed
 qed
 
 end
