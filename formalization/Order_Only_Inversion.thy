@@ -17,6 +17,28 @@ text \<open>
 definition sigmoid :: "real \<Rightarrow> real" where
   "sigmoid x = 1 / (1 + exp (- x))"
 
+definition logistic_loss :: "real \<Rightarrow> real" where
+  "logistic_loss z = ln (1 + exp (- z))"
+
+lemma logistic_loss_has_real_derivative:
+  "(logistic_loss has_real_derivative - sigmoid (- z)) (at z)"
+  unfolding logistic_loss_def sigmoid_def
+proof -
+  have positive: "0 < 1 + exp (- z)"
+    using exp_gt_zero[of "- z"] by linarith
+  have derivative:
+    "((\<lambda>z. ln (1 + exp (- z))) has_real_derivative
+      (- exp (- z)) / (1 + exp (- z))) (at z)"
+    using positive by (auto intro!: derivative_eq_intros)
+  have quotient:
+    "(- exp (- z)) / (1 + exp (- z)) = - (1 / (1 + exp z))"
+    using exp_gt_zero[of z]
+    by (simp add: exp_minus field_simps)
+  show "((\<lambda>z. ln (1 + exp (- z))) has_real_derivative
+      - (1 / (1 + exp (- (- z))))) (at z)"
+    using derivative quotient by simp
+qed
+
 definition anchor_step :: "real \<Rightarrow> real \<Rightarrow> real" where
   "anchor_step \<eta> w = w + \<eta> * sigmoid (- w)"
 
@@ -188,8 +210,48 @@ section \<open>Clean labels and pointwise classification reversal\<close>
 definition clean_label :: "real \<Rightarrow> real \<Rightarrow> real" where
   "clean_label s t = s * t"
 
+definition logistic_example_loss :: "real \<Rightarrow> real \<Rightarrow> real \<Rightarrow> real" where
+  "logistic_example_loss s y w = logistic_loss (y * (w * s))"
+
+definition logistic_example_gradient :: "real \<Rightarrow> real \<Rightarrow> real \<Rightarrow> real" where
+  "logistic_example_gradient s y w =
+    - y * s * sigmoid (- (y * (w * s)))"
+
+lemma logistic_example_loss_has_real_derivative:
+  "((logistic_example_loss s y) has_real_derivative
+      logistic_example_gradient s y w) (at w)"
+proof -
+  have inner:
+    "((\<lambda>w. y * (w * s)) has_derivative (\<lambda>h. (y * s) * h)) (at w)"
+    by (auto intro!: derivative_eq_intros)
+  note outer = logistic_loss_has_real_derivative[of "y * (w * s)"]
+  note composed = DERIV_compose_FDERIV[OF outer inner]
+  show ?thesis
+    unfolding logistic_example_loss_def logistic_example_gradient_def
+      has_field_derivative_def
+  proof (rule has_derivative_eq_rhs[OF composed])
+    show "(\<lambda>x. y * s * x * - sigmoid (- (y * (w * s)))) =
+      (*) (- y * s * sigmoid (- (y * (w * s))))"
+      by (rule ext) (simp add: algebra_simps)
+  qed
+qed
+
+definition logistic_sgd_step :: "real \<Rightarrow> real \<Rightarrow> real \<Rightarrow> real \<Rightarrow> real" where
+  "logistic_sgd_step eta s y w =
+    w - eta * logistic_example_gradient s y w"
+
+lemma clean_logistic_sgd_step:
+  assumes signal_sign: "s = 1 \<or> s = -1"
+    and subgroup_sign: "t = 1 \<or> t = -1"
+  shows "logistic_sgd_step eta s (clean_label s t) w =
+    (if t = 1 then anchor_step eta w else tail_step eta w)"
+  using signal_sign subgroup_sign
+  unfolding logistic_sgd_step_def logistic_example_gradient_def clean_label_def
+    anchor_step_def tail_step_def
+  by auto
+
 definition prediction :: "real \<Rightarrow> real \<Rightarrow> real" where
-  "prediction w s = (if 0 \<le> w * s then 1 else - 1)"
+  "prediction w s = (if 0 < w * s then 1 else - 1)"
 
 lemma anchor_label: "clean_label s 1 = s"
   by (simp add: clean_label_def)

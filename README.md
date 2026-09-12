@@ -68,16 +68,23 @@ uv run python -m unittest discover -s tests -v
 The `Bad_Curriculum` session formalizes the order-only construction in three
 layers:
 
-- exact finite-step logistic-SGD inversion and clean-label prediction reversal;
-- uniform finite-population permutation concentration, exact risk/AUC formulas,
-  and a vanishing-tail family whose random-order success probability tends to
-  one;
-- realizable two-coordinate dynamics, momentum transfer for every fixed
-  `0 <= mu < 1`, and additive perturbation bounds.
+- exact finite-step logistic-SGD inversion, a concrete adversarial presentation
+  order, and clean-label prediction reversal under a strict zero-margin
+  convention;
+- uniform finite-population permutation concentration, finite-list empirical
+  risk/AUC bridges, and a vanishing-tail family whose random-order success
+  probability tends to one;
+- realizable two-coordinate dynamics, momentum transfer for fixed and varying
+  coefficients under explicit error conditions, and perturbation transfer in
+  real normed vector spaces.
 
-`order_only_inversion_complete_asymptotic` combines the scalar,
-random-permutation, realizable, and momentum asymptotic conclusions. Build the
-complete session with:
+`order_only_inversion_complete_asymptotic` is unconditional: it combines the
+explicit scalar attack order, random-permutation event, realizable transfer, and
+the exact zero-momentum reference trajectory. The broader arbitrary fixed
+momentum theorem remains conditional on `0 <= mu < 1`. Separate definitions
+record linear realizability and the stronger bounded uniform-margin property,
+and `inversion_exponent_regime` exposes the admissible scaling inequalities.
+Build the complete session with:
 
 ```bash
 isabelle build -D formalization Bad_Curriculum

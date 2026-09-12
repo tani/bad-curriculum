@@ -1,9 +1,6 @@
 theory Order_Only_Inversion_Extensions
   imports Finite_Population_Hoeffding
 begin
-definition clean_label :: "real \<Rightarrow> real \<Rightarrow> real" where
-  "clean_label s t = s * t"
-
 definition linear_score :: "real \<Rightarrow> real \<Rightarrow> real" where
   "linear_score w s = w * s"
 
@@ -15,6 +12,14 @@ lemma clean_signed_margin:
 
 definition zero_one_margin_loss :: "real \<Rightarrow> real" where
   "zero_one_margin_loss z = (if 0 < z then 0 else 1)"
+
+definition probability_parameter :: "real \<Rightarrow> bool" where
+  "probability_parameter epsilon \<longleftrightarrow> 0 \<le> epsilon \<and> epsilon \<le> 1"
+
+lemma probability_parameter_bounds:
+  assumes "probability_parameter epsilon"
+  shows "0 \<le> epsilon" and "epsilon \<le> 1"
+  using assms unfolding probability_parameter_def by auto
 
 definition clean_test_risk :: "real \<Rightarrow> real \<Rightarrow> real" where
   "clean_test_risk epsilon w =
@@ -112,6 +117,38 @@ definition example_label :: "structured_example \<Rightarrow> real" where
 definition example_identity :: "structured_example \<Rightarrow> bool \<times> nat" where
   "example_identity x = (case x of (s, t, r) \<Rightarrow> r)"
 
+definition example_signal :: "structured_example \<Rightarrow> real" where
+  "example_signal x = (case x of (s, t, r) \<Rightarrow> s)"
+
+definition example_score :: "real \<Rightarrow> structured_example \<Rightarrow> real" where
+  "example_score w x = w * example_signal x"
+
+definition example_margin_loss :: "real \<Rightarrow> structured_example \<Rightarrow> real" where
+  "example_margin_loss w x =
+    zero_one_margin_loss (example_label x * example_score w x)"
+
+definition empirical_risk :: "structured_example list \<Rightarrow> real \<Rightarrow> real" where
+  "empirical_risk xs w =
+    (if xs = [] then 0
+     else sum_list (map (example_margin_loss w) xs) / real (length xs))"
+
+definition positive_scores ::
+    "structured_example list \<Rightarrow> real \<Rightarrow> real list" where
+  "positive_scores xs w =
+    map (example_score w) (filter (\<lambda>x. example_label x = 1) xs)"
+
+definition negative_scores ::
+    "structured_example list \<Rightarrow> real \<Rightarrow> real list" where
+  "negative_scores xs w =
+    map (example_score w) (filter (\<lambda>x. example_label x = -1) xs)"
+
+definition empirical_auc :: "structured_example list \<Rightarrow> real \<Rightarrow> real" where
+  "empirical_auc xs w =
+    (let ps = positive_scores xs w; ns = negative_scores xs w in
+      if ps = [] \<or> ns = [] then 0
+      else sum_list (map (\<lambda>p. sum_list (map (auc_pair_credit p) ns)) ps) /
+        (real (length ps) * real (length ns)))"
+
 definition balanced_block :: "real \<Rightarrow> nat \<Rightarrow> structured_example list" where
   "balanced_block t k =
     map (\<lambda>i. (1, t, (True, i))) [0..<k] @
@@ -132,6 +169,91 @@ proof (rule nth_equalityI)
     by simp
 qed
 
+definition balanced_test_pool ::
+    "nat \<Rightarrow> nat \<Rightarrow> structured_example list" where
+  "balanced_test_pool anchor_count tail_count =
+    balanced_block 1 anchor_count @ balanced_block (-1) tail_count"
+
+lemma balanced_block_margin_losses:
+  "map (example_margin_loss w) (balanced_block t k) =
+    replicate (2 * k) (zero_one_margin_loss (w * t))"
+  proof -
+  have positive_function:
+    "example_margin_loss w \<circ> (\<lambda>i. (1, t, (True, i))) =
+      (\<lambda>i. zero_one_margin_loss (w * t))"
+    by (rule ext)
+      (simp add: example_margin_loss_def example_label_def example_score_def
+        example_signal_def algebra_simps)
+  have negative_function:
+    "example_margin_loss w \<circ> (\<lambda>i. (-1, t, (False, i))) =
+      (\<lambda>i. zero_one_margin_loss (w * t))"
+    by (rule ext)
+      (simp add: example_margin_loss_def example_label_def example_score_def
+        example_signal_def algebra_simps)
+  show ?thesis
+    unfolding balanced_block_def map_append map_map positive_function
+      negative_function map_constant_upt
+    by (simp only: mult_2 replicate_add)
+qed
+
+lemma empirical_risk_balanced_test_pool:
+  assumes nonempty: "0 < anchor_count + tail_count"
+  shows "empirical_risk (balanced_test_pool anchor_count tail_count) w =
+    clean_test_risk (real tail_count / real (anchor_count + tail_count)) w"
+proof -
+  have count_nonzero: "anchor_count + tail_count \<noteq> 0"
+    using nonempty by auto
+  have denominator_positive: "0 < real (anchor_count + tail_count)"
+    using nonempty by (simp only: of_nat_0_less_iff)
+  have denominator_nonzero: "real (anchor_count + tail_count) \<noteq> 0"
+    using denominator_positive by linarith
+  have pool_length:
+    "length (balanced_test_pool anchor_count tail_count) =
+      2 * (anchor_count + tail_count)"
+    unfolding balanced_test_pool_def
+    by (simp add: balanced_block_length distrib_left)
+  have pool_nonempty: "balanced_test_pool anchor_count tail_count \<noteq> []"
+    using pool_length nonempty by auto
+  have expanded_pool_nonempty:
+    "balanced_block 1 anchor_count @ balanced_block (-1) tail_count \<noteq> []"
+    using pool_nonempty unfolding balanced_test_pool_def by assumption
+  have empirical_nonempty:
+    "empirical_risk (balanced_test_pool anchor_count tail_count) w =
+      sum_list (map (example_margin_loss w)
+        (balanced_test_pool anchor_count tail_count)) /
+      real (length (balanced_test_pool anchor_count tail_count))"
+    unfolding empirical_risk_def
+    by (simp only: if_not_P[OF pool_nonempty])
+  have expansion:
+    "empirical_risk (balanced_test_pool anchor_count tail_count) w =
+      (real (2 * anchor_count) * zero_one_margin_loss w +
+       real (2 * tail_count) * zero_one_margin_loss (- w)) /
+       real (2 * (anchor_count + tail_count))"
+    using empirical_nonempty
+    unfolding balanced_test_pool_def
+    by (simp add: balanced_block_length balanced_block_margin_losses
+        sum_list_replicate)
+  have doubled_denominator:
+    "2 * real anchor_count + 2 * real tail_count =
+      2 * (real anchor_count + real tail_count)"
+    by algebra
+  have inverse_cancel:
+    "(real anchor_count + real tail_count) *
+      inverse (real anchor_count + real tail_count) = 1"
+    using denominator_nonzero by simp
+  have inverse_two: "inverse (2::real) = 0.5"
+    by simp
+  show ?thesis
+    unfolding clean_test_risk_def
+    apply (subst expansion)
+    apply (simp only: of_nat_mult of_nat_add)
+    apply (simp only: divide_inverse inverse_mult_distrib)
+    apply simp
+    apply (subst inverse_cancel[symmetric])
+    apply algebra
+    done
+qed
+
 lemma balanced_block_labels:
   "map example_label (balanced_block t k) =
     replicate k t @ replicate k (-t)"
@@ -150,8 +272,116 @@ proof -
 
 qed
 
+lemma map_upt_ext_constant:
+  assumes pointwise: "\<And>i. i < k \<Longrightarrow> f i = c"
+  shows "map f [0..<k] = replicate k c"
+  unfolding map_constant_upt[symmetric]
+  by (rule map_cong) (use pointwise in auto)
 
+lemma balanced_block_positive_scores:
+  assumes subgroup_sign: "t = 1 \<or> t = -1"
+  shows "positive_scores (balanced_block t k) w =
+    (if t = 1 then replicate k w else replicate k (-w))"
+  proof -
+  have positive_score_function:
+    "((\<lambda>x. w * (case x of (s, t, r) \<Rightarrow> s)) \<circ>
+      (\<lambda>i. (1, t, (True, i)))) = (\<lambda>i. w)"
+    by (rule ext) simp
+  have negative_score_function:
+    "((\<lambda>x. w * (case x of (s, t, r) \<Rightarrow> s)) \<circ>
+      (\<lambda>i. (-1, t, (False, i)))) = (\<lambda>i. -w)"
+    by (rule ext) simp
+  show ?thesis
+    using subgroup_sign
+    unfolding positive_scores_def balanced_block_def example_label_def
+      example_score_def example_signal_def map_append map_map
+      positive_score_function negative_score_function map_constant_upt
+    apply (elim disjE)
+    apply simp
+    apply (rule map_upt_ext_constant)
+    apply simp
+    apply simp
+    apply (rule map_upt_ext_constant)
+    apply simp
+    done
+qed
 
+lemma balanced_block_negative_scores:
+  assumes subgroup_sign: "t = 1 \<or> t = -1"
+  shows "negative_scores (balanced_block t k) w =
+    (if t = 1 then replicate k (-w) else replicate k w)"
+  using subgroup_sign
+  unfolding negative_scores_def balanced_block_def example_label_def
+    example_score_def example_signal_def
+  apply (elim disjE)
+  apply simp
+  apply (rule map_upt_ext_constant)
+  apply simp
+  apply simp
+  apply (rule map_upt_ext_constant)
+  apply simp
+  done
+
+lemma positive_scores_append [simp]:
+  "positive_scores (xs @ ys) w =
+    positive_scores xs w @ positive_scores ys w"
+  unfolding positive_scores_def by simp
+
+lemma negative_scores_append [simp]:
+  "negative_scores (xs @ ys) w =
+    negative_scores xs w @ negative_scores ys w"
+  unfolding negative_scores_def by simp
+
+lemma balanced_test_pool_positive_scores:
+  "positive_scores (balanced_test_pool anchor_count tail_count) w =
+    replicate anchor_count w @ replicate tail_count (-w)"
+  unfolding balanced_test_pool_def
+  by (simp add: balanced_block_positive_scores)
+
+lemma balanced_test_pool_negative_scores:
+  "negative_scores (balanced_test_pool anchor_count tail_count) w =
+    replicate anchor_count (-w) @ replicate tail_count w"
+  unfolding balanced_test_pool_def
+  by (simp add: balanced_block_negative_scores)
+
+lemma empirical_auc_balanced_test_pool:
+  assumes nonempty: "0 < anchor_count + tail_count"
+  shows "empirical_auc (balanced_test_pool anchor_count tail_count) w =
+    clean_test_auc (real tail_count / real (anchor_count + tail_count)) w"
+proof -
+  have scores_nonempty:
+    "replicate anchor_count w @ replicate tail_count (-w) \<noteq> []"
+    "replicate anchor_count (-w) @ replicate tail_count w \<noteq> []"
+    using nonempty by auto
+  have score_condition:
+    "\<not> (replicate anchor_count w @ replicate tail_count (-w) = [] \<or>
+       replicate anchor_count (-w) @ replicate tail_count w = [])"
+    using scores_nonempty by blast
+  have denominator_positive:
+    "0 < real (anchor_count + tail_count)"
+    using nonempty by (simp only: of_nat_0_less_iff)
+  have denominator_nonzero:
+    "real anchor_count + real tail_count \<noteq> 0"
+    using denominator_positive
+    unfolding of_nat_add
+    by linarith
+  have inverse_cancel:
+    "(real anchor_count + real tail_count) *
+      inverse (real anchor_count + real tail_count) = 1"
+    using denominator_nonzero by simp
+  show ?thesis
+    unfolding empirical_auc_def clean_test_auc_def Let_def
+      balanced_test_pool_positive_scores balanced_test_pool_negative_scores
+    apply (simp only: if_not_P[OF score_condition])
+    apply (simp add: sum_list_replicate power2_eq_square)
+    apply (simp only: divide_inverse inverse_mult_distrib)
+    apply (subst inverse_cancel[symmetric])
+    apply (subst inverse_cancel[symmetric])
+    apply (subst inverse_cancel[symmetric])
+    apply (subst inverse_cancel[symmetric])
+    apply algebra
+    done
+qed
 
 lemma balanced_block_identities_distinct:
   "distinct (map example_identity (balanced_block t k))"
@@ -916,6 +1146,39 @@ proof -
   show ?thesis using attack_risk random_risk attack_auc random_auc by blast
 qed
 
+theorem realizable_random_metric_transfer:
+  fixes eta kappa q epsilon :: real
+  assumes eta_positive: "0 < eta"
+    and eta_at_most_four: "eta \<le> 4"
+    and kappa_nonzero: "kappa \<noteq> 0"
+    and N_positive: "0 < N"
+    and reference_margin: "1 \<le> binary_logistic_state eta q xs N"
+    and error_small: "realizable_transfer_error eta kappa N < 1"
+  shows "realizable_test_risk epsilon
+      (realizable_a_state eta kappa xs N)
+      (realizable_u_state eta kappa xs N) = epsilon"
+    and "realizable_test_auc epsilon
+      (realizable_a_state eta kappa xs N)
+      (realizable_u_state eta kappa xs N) = 1 - epsilon^2"
+proof -
+  have eta_nonnegative: "0 \<le> eta"
+    using eta_positive by linarith
+  have u_positive: "0 < realizable_u_state eta kappa xs N"
+    by (rule realizable_u_state_positive[OF eta_positive kappa_nonzero N_positive])
+  have dominance:
+    "realizable_u_state eta kappa xs N < realizable_a_state eta kappa xs N"
+    by (rule realizable_positive_dominance_transfer
+        [OF eta_nonnegative eta_at_most_four reference_margin error_small])
+  show "realizable_test_risk epsilon
+      (realizable_a_state eta kappa xs N)
+      (realizable_u_state eta kappa xs N) = epsilon"
+    by (rule realizable_test_risk_positive[OF u_positive dominance])
+  show "realizable_test_auc epsilon
+      (realizable_a_state eta kappa xs N)
+      (realizable_u_state eta kappa xs N) = 1 - epsilon^2"
+    by (rule realizable_test_auc_random[OF u_positive dominance])
+qed
+
 primrec momentum_logistic_state ::
     "real \<Rightarrow> real \<Rightarrow> bool list \<Rightarrow> nat \<Rightarrow> real \<times> real" where
   "momentum_logistic_state eta mu xs 0 = (0, 0)"
@@ -1376,6 +1639,28 @@ proof -
   show ?thesis using forward_difference reference_margin error_small by linarith
 qed
 
+lemma momentum_zero_reference_exact:
+  assumes eta_nonnegative: "0 \<le> eta" and eta_at_most_four: "eta \<le> 4"
+  shows "momentum_w_state eta 0 xs N = binary_logistic_state eta q xs N"
+proof -
+  have comparison:
+    "abs (momentum_w_state eta 0 xs N -
+      binary_logistic_state (momentum_effective_step eta 0) q xs N) \<le>
+      momentum_transfer_error eta 0 N"
+    apply (rule momentum_state_comparison)
+    apply (rule eta_nonnegative)
+    apply simp
+    apply simp
+    using eta_at_most_four
+    apply (simp add: momentum_effective_step_def)
+    done
+  show ?thesis
+    using comparison
+    unfolding momentum_effective_step_def momentum_transfer_error_def
+      momentum_transform_error_def
+    by simp
+qed
+
 theorem momentum_inversion_transfer:
   fixes eta mu q G_attack G_random epsilon :: real
   assumes eta_positive: "0 < eta"
@@ -1656,6 +1941,100 @@ proof -
   note eventual_upper = order_tendstoD(2)
     [OF curriculum_momentum_transfer_error_tendsto_zero, of G]
   show ?thesis using eventual_upper assms by simp
+qed
+
+definition attack_order :: "nat \<Rightarrow> nat \<Rightarrow> bool list" where
+  "attack_order n m = replicate n True @ replicate m False"
+
+lemma binary_logistic_state_true_prefix:
+  assumes prefix: "\<And>i. i < k \<Longrightarrow> xs ! i = True"
+  shows "binary_logistic_state eta q xs k = anchor_state eta k"
+using prefix
+proof (induction k)
+  case 0
+  show ?case
+    unfolding binary_logistic_state_def anchor_state_def perturbed_iteration_def
+    by simp
+next
+  case (Suc k)
+  have current: "xs ! k = True"
+    using Suc.prems by simp
+  have earlier: "\<And>i. i < k \<Longrightarrow> xs ! i = True"
+    using Suc.prems by simp
+  have previous: "binary_logistic_state eta q xs k = anchor_state eta k"
+    by (rule Suc.IH[OF earlier])
+  show ?case
+    using current previous
+    by (simp add: binary_logistic_state_Suc anchor_state_def
+        funpow_Suc_right anchor_step_def bool_value_def sigmoid_neg_identity)
+qed
+
+lemma binary_logistic_state_false_suffix:
+  assumes start: "binary_logistic_state eta q xs n = w"
+    and suffix: "\<And>j. j < k \<Longrightarrow> xs ! (n + j) = False"
+  shows "binary_logistic_state eta q xs (n + k) = ((tail_step eta) ^^ k) w"
+using suffix
+proof (induction k)
+  case 0
+  show ?case using start by simp
+next
+  case (Suc k)
+  have current: "xs ! (n + k) = False"
+    using Suc.prems by simp
+  have earlier: "\<And>j. j < k \<Longrightarrow> xs ! (n + j) = False"
+    using Suc.prems by simp
+  have previous:
+    "binary_logistic_state eta q xs (n + k) = ((tail_step eta) ^^ k) w"
+    by (rule Suc.IH[OF earlier])
+  have tail_expansion: "tail_step eta = (\<lambda>a. a - eta * sigmoid a)"
+    unfolding tail_step_def by (rule ext) simp
+  show ?case
+    unfolding add_Suc_right tail_step_def
+    apply (simp only: binary_logistic_state_Suc previous)
+    apply (simp only: tail_expansion)
+    using current
+    apply (simp add: funpow_Suc_right funpow_swap1 bool_value_def
+        tail_step_def)
+    done
+qed
+
+lemma binary_logistic_state_attack_order:
+  "binary_logistic_state eta q (attack_order n m) (n + m) =
+    attack_state eta n m"
+proof -
+  have prefix: "\<And>i. i < n \<Longrightarrow> attack_order n m ! i = True"
+  proof -
+    fix i
+    assume i_less: "i < n"
+    show "attack_order n m ! i = True"
+      unfolding attack_order_def
+      using i_less
+      apply (simp only: nth_append length_replicate i_less if_True nth_replicate)
+      done
+  qed
+  have suffix: "\<And>j. j < m \<Longrightarrow> attack_order n m ! (n + j) = False"
+  proof -
+    fix j
+    assume j_less: "j < m"
+    have index: "n + j = length (replicate n True) + j"
+      by simp
+    have offset:
+      "(replicate n True @ replicate m False) ! (n + j) =
+        replicate m False ! j"
+      unfolding index
+      by (rule nth_append_length_plus)
+    show "attack_order n m ! (n + j) = False"
+      unfolding attack_order_def
+      using offset j_less
+      apply (simp only: nth_replicate)
+      done
+  qed
+  have start:
+    "binary_logistic_state eta q (attack_order n m) n = anchor_state eta n"
+    by (rule binary_logistic_state_true_prefix[OF prefix])
+  show ?thesis
+    unfolding attack_state_def
+    by (rule binary_logistic_state_false_suffix[OF start suffix])
 qed
 
 theorem finite_pool_order_only_inversion:
@@ -3355,7 +3734,7 @@ lemma curriculum_random_inversion_probability_eventually:
   unfolding curriculum_random_inversion_event_def
   by eventually_elim blast
 
-theorem order_only_inversion_complete_asymptotic:
+theorem order_only_inversion_conditional_asymptotic:
   fixes mu :: real and xs_attack xs_random :: "nat \<Rightarrow> bool list"
   assumes mu_nonnegative: "0 \<le> mu"
     and mu_less_one: "mu < 1"
@@ -3501,6 +3880,198 @@ proof -
       (curriculum_population k)) \<longlongrightarrow> 0) sequentially"
     by (rule curriculum_momentum_transfer_error_tendsto_zero_general
         [OF mu_less_one])
+qed
+
+theorem order_only_inversion_complete_asymptotic:
+  shows "(curriculum_tail_ratio \<longlongrightarrow> 0) sequentially"
+    and "(curriculum_confidence \<longlongrightarrow> 0) sequentially"
+    and "\<forall>\<^sub>F k in sequentially. 1 - curriculum_confidence k \<le>
+      uniform_probability
+        (binary_orders (curriculum_anchor_count k) (curriculum_population k))
+        (curriculum_random_inversion_event k)"
+    and "((\<lambda>k.
+      (clean_test_risk (curriculum_tail_ratio k)
+        (binary_logistic_state (curriculum_learning_rate k)
+          (real (curriculum_anchor_count k) / real (curriculum_population k))
+          (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
+          (curriculum_population k)),
+       clean_test_auc (curriculum_tail_ratio k)
+        (binary_logistic_state (curriculum_learning_rate k)
+          (real (curriculum_anchor_count k) / real (curriculum_population k))
+          (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
+          (curriculum_population k)))) \<longlongrightarrow> (1, 0)) sequentially"
+    and "\<And>k xs q. momentum_w_state (curriculum_learning_rate k) 0 xs
+      (curriculum_population k) =
+      binary_logistic_state (curriculum_learning_rate k) q xs
+        (curriculum_population k)"
+    and "((\<lambda>k. realizable_transfer_error (curriculum_learning_rate k)
+      (curriculum_realizable_scale k) (curriculum_population k))
+      \<longlongrightarrow> 0) sequentially"
+    and "((\<lambda>k. momentum_transfer_error (curriculum_learning_rate k) 0
+      (curriculum_population k)) \<longlongrightarrow> 0) sequentially"
+proof -
+  show "(curriculum_tail_ratio \<longlongrightarrow> 0) sequentially"
+    by (rule curriculum_tail_ratio_tendsto_zero)
+  show "(curriculum_confidence \<longlongrightarrow> 0) sequentially"
+    by (rule curriculum_confidence_tendsto_zero)
+  show "\<forall>\<^sub>F k in sequentially. 1 - curriculum_confidence k \<le>
+      uniform_probability
+        (binary_orders (curriculum_anchor_count k) (curriculum_population k))
+        (curriculum_random_inversion_event k)"
+    by (rule curriculum_random_inversion_probability_eventually)
+  show "((\<lambda>k.
+      (clean_test_risk (curriculum_tail_ratio k)
+        (binary_logistic_state (curriculum_learning_rate k)
+          (real (curriculum_anchor_count k) / real (curriculum_population k))
+          (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
+          (curriculum_population k)),
+       clean_test_auc (curriculum_tail_ratio k)
+        (binary_logistic_state (curriculum_learning_rate k)
+          (real (curriculum_anchor_count k) / real (curriculum_population k))
+          (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
+          (curriculum_population k)))) \<longlongrightarrow> (1, 0)) sequentially"
+  proof (rule Lim_transform_eventually)
+    show "((\<lambda>k.
+      (clean_test_risk (curriculum_tail_ratio k)
+        (attack_state (curriculum_learning_rate k)
+          (curriculum_anchor_count k) (curriculum_tail_count k)),
+       clean_test_auc (curriculum_tail_ratio k)
+        (attack_state (curriculum_learning_rate k)
+          (curriculum_anchor_count k) (curriculum_tail_count k))))
+      \<longlongrightarrow> (1, 0)) sequentially"
+      by (intro tendsto_Pair curriculum_attack_risk_tendsto_one
+          curriculum_attack_auc_tendsto_zero)
+    show "\<forall>\<^sub>F k in sequentially.
+      (clean_test_risk (curriculum_tail_ratio k)
+        (attack_state (curriculum_learning_rate k)
+          (curriculum_anchor_count k) (curriculum_tail_count k)),
+       clean_test_auc (curriculum_tail_ratio k)
+        (attack_state (curriculum_learning_rate k)
+          (curriculum_anchor_count k) (curriculum_tail_count k))) =
+      (clean_test_risk (curriculum_tail_ratio k)
+        (binary_logistic_state (curriculum_learning_rate k)
+          (real (curriculum_anchor_count k) / real (curriculum_population k))
+          (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
+          (curriculum_population k)),
+       clean_test_auc (curriculum_tail_ratio k)
+        (binary_logistic_state (curriculum_learning_rate k)
+          (real (curriculum_anchor_count k) / real (curriculum_population k))
+          (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
+          (curriculum_population k)))"
+      apply (rule always_eventually)
+      proof
+        fix k
+        have count_sum:
+          "curriculum_anchor_count k + curriculum_tail_count k =
+            curriculum_population k"
+          using curriculum_counts[of k] by simp
+        have state_eq:
+          "binary_logistic_state (curriculum_learning_rate k)
+            (real (curriculum_anchor_count k) / real (curriculum_population k))
+            (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
+            (curriculum_population k) =
+           attack_state (curriculum_learning_rate k)
+            (curriculum_anchor_count k) (curriculum_tail_count k)"
+          using binary_logistic_state_attack_order
+            [of "curriculum_learning_rate k"
+              "real (curriculum_anchor_count k) / real (curriculum_population k)"
+              "curriculum_anchor_count k" "curriculum_tail_count k"]
+            count_sum by simp
+        show "(clean_test_risk (curriculum_tail_ratio k)
+          (attack_state (curriculum_learning_rate k)
+            (curriculum_anchor_count k) (curriculum_tail_count k)),
+         clean_test_auc (curriculum_tail_ratio k)
+          (attack_state (curriculum_learning_rate k)
+            (curriculum_anchor_count k) (curriculum_tail_count k))) =
+        (clean_test_risk (curriculum_tail_ratio k)
+          (binary_logistic_state (curriculum_learning_rate k)
+            (real (curriculum_anchor_count k) / real (curriculum_population k))
+            (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
+            (curriculum_population k)),
+         clean_test_auc (curriculum_tail_ratio k)
+          (binary_logistic_state (curriculum_learning_rate k)
+            (real (curriculum_anchor_count k) / real (curriculum_population k))
+            (attack_order (curriculum_anchor_count k) (curriculum_tail_count k))
+            (curriculum_population k)))"
+          using state_eq by simp
+      qed
+  qed
+  show "\<And>k xs q. momentum_w_state (curriculum_learning_rate k) 0 xs
+      (curriculum_population k) =
+      binary_logistic_state (curriculum_learning_rate k) q xs
+        (curriculum_population k)"
+    by (rule momentum_zero_reference_exact
+        [OF order_less_imp_le[OF curriculum_learning_rate_positive]
+          curriculum_learning_rate_at_most_four])
+  show "((\<lambda>k. realizable_transfer_error (curriculum_learning_rate k)
+      (curriculum_realizable_scale k) (curriculum_population k))
+      \<longlongrightarrow> 0) sequentially"
+    by (rule curriculum_realizable_transfer_error_tendsto_zero)
+  show "((\<lambda>k. momentum_transfer_error (curriculum_learning_rate k) 0
+      (curriculum_population k)) \<longlongrightarrow> 0) sequentially"
+    by (rule curriculum_momentum_transfer_error_tendsto_zero_general) simp
+qed
+
+definition linearly_realizable :: "real list \<Rightarrow> bool" where
+  "linearly_realizable margins \<longleftrightarrow>
+    (\<exists>w. \<forall>z \<in> set margins. 0 < w * z)"
+
+definition uniform_margin_realizable ::
+    "real \<Rightarrow> real \<Rightarrow> real list \<Rightarrow> bool" where
+  "uniform_margin_realizable gamma B margins \<longleftrightarrow>
+    (\<exists>w. abs w \<le> B \<and> (\<forall>z \<in> set margins. gamma \<le> w * z))"
+
+lemma uniform_margin_realizable_imp_linearly_realizable:
+  assumes gamma_positive: "0 < gamma"
+    and uniform: "uniform_margin_realizable gamma B margins"
+  shows "linearly_realizable margins"
+proof -
+  obtain w where witness:
+      "abs w \<le> B" "\<forall>z \<in> set margins. gamma \<le> w * z"
+    using uniform unfolding uniform_margin_realizable_def by blast
+  show ?thesis
+    unfolding linearly_realizable_def
+  proof (intro exI ballI)
+    fix z
+    assume "z \<in> set margins"
+    then have "gamma \<le> w * z" using witness by blast
+    then show "0 < w * z" using gamma_positive by linarith
+  qed
+qed
+
+definition inversion_exponent_regime :: "real \<Rightarrow> real \<Rightarrow> bool" where
+  "inversion_exponent_regime a b \<longleftrightarrow> a / 2 < b \<and> b < a - 1"
+
+lemma inversion_exponent_regime_conditions:
+  assumes regime: "inversion_exponent_regime a b"
+  shows "2 < a" "0 < b - a / 2" "0 < a - 1 - b"
+  using regime unfolding inversion_exponent_regime_def by linarith+
+
+definition admissible_momentum_schedule :: "(nat \<Rightarrow> real) \<Rightarrow> bool" where
+  "admissible_momentum_schedule mu \<longleftrightarrow>
+    (\<forall>k. 0 \<le> mu k \<and> mu k < 1)"
+
+lemma varying_momentum_transfer_eventually_small:
+  assumes error_limit:
+      "((\<lambda>k. momentum_transfer_error (eta k) (mu k) (N k))
+        \<longlongrightarrow> 0) sequentially"
+    and margin_positive: "0 < G"
+  shows "\<forall>\<^sub>F k in sequentially.
+    momentum_transfer_error (eta k) (mu k) (N k) < G"
+proof -
+  note eventual_upper = order_tendstoD(2)[OF error_limit, of G]
+  show ?thesis using eventual_upper margin_positive by simp
+qed
+
+lemma normed_perturbation_transfer:
+  fixes F :: "'a::real_normed_vector \<Rightarrow> 'a"
+  assumes nonexpansive: "norm (F x - F y) \<le> norm (x - y)"
+  shows "norm ((F x + e) - F y) \<le> norm (x - y) + norm e"
+proof -
+  have identity: "(F x + e) - F y = (F x - F y) + e" by simp
+  have triangle: "norm ((F x - F y) + e) \<le> norm (F x - F y) + norm e"
+    by (rule norm_triangle_ineq)
+  show ?thesis unfolding identity using triangle nonexpansive by linarith
 qed
 
 end
