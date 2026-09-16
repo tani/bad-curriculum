@@ -1,5 +1,16 @@
 session "Bad_Curriculum" = "HOL-Probability" +
+  directories
+    sgd
+    "momentum-sgd"
+    adam
+    adamw
   theories
     Order_Only_Inversion
     Finite_Population_Hoeffding
     Order_Only_Inversion_Extensions
+    SGD_Order_Only
+    Momentum_SGD_Order_Only
+    Adam_Core
+    Adam_Bridge
+    Adam_Order_Only
+    AdamW_Order_Only

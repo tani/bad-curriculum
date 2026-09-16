@@ -188,6 +188,36 @@ layers:
   spaces, and deterministic prefix-discrepancy control for low-discrepancy
   schedules.
 
+Optimizer-specific entry theories live under the corresponding CLI names:
+
+- `formalization/sgd/SGD_Order_Only.thy`
+- `formalization/momentum-sgd/Momentum_SGD_Order_Only.thy`
+- `formalization/adam/Adam_Order_Only.thy`
+- `formalization/adamw/AdamW_Order_Only.thy`
+
+Each entry theory defines the optimizer's exact scalar state recurrence and
+exports finite Anchor → Counterexample Tail inversion and clean-test risk/AUC
+theorems. Adam and AdamW share the bias-corrected moment core in
+`formalization/adam/Adam_Core.thy`; Adam specializes decoupled weight decay to
+zero, while AdamW retains a nonnegative decay satisfying
+`eta * decay <= 1`.
+
+`formalization/adam/Adam_Bridge.thy` closes the two gaps that previously left
+the Adam/AdamW inversion premises unsupplied. It proves deterministic tracking
+of the bias-corrected first moment with slack
+`beta1 * eta / (2 * eps * (1 - beta1))`, turns it into the explicit Anchor
+bound `ln (1 + n * (exp (eta/eps) - 1)) + n * (eta/eps) * slack`, and derives
+an interval-drift certificate from a prefix-discrepancy hypothesis. Feeding
+that certificate to `aw_interval_barrier` and the finite-population bound
+`uniform_binary_order_max_prefix_confidence` yields
+`adam_random_order_benign_probability` and
+`adamw_random_order_benign_probability`: for a uniformly random presentation
+order the final weight stays positive with probability at least `1 - conf`.
+The explicit-anchor inversion theorems
+`adam_anchor_tail_inversion_explicit` and
+`adamw_anchor_tail_inversion_explicit` no longer take the anchor bound as a
+premise.
+
 `order_only_inversion_complete_asymptotic` is unconditional: it combines the
 explicit scalar attack order, random-permutation event, realizable transfer and
 attack metric limits, and the exact zero-momentum reference trajectory.
@@ -207,5 +237,5 @@ linear realizability and the stronger bounded uniform-margin property.
 Build the complete session with:
 
 ```bash
-isabelle build -D formalization Bad_Curriculum
+isabelle build -o quick_and_dirty=false -D formalization Bad_Curriculum
 ```
