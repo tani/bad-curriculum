@@ -3,20 +3,23 @@ from __future__ import annotations
 import csv
 import html
 import json
+import logging
 import math
 import sys
 from pathlib import Path
 from typing import Sequence
 
-import numpy as np
+import pytorch_lightning as pl
 import torch
 import torch.nn.functional as F
-from sklearn.metrics import confusion_matrix, roc_auc_score
 from torch.utils.data import DataLoader, Dataset
+from torchmetrics.functional.classification import binary_accuracy, binary_auroc, binary_confusion_matrix
 
 from .config import ExperimentConfig, SCRIPT_VERSION
 from .data import Example, FrequentWordVocabulary, PAD_ID, SelectorPartition
-from .model import InversionLSTM
+
+logging.getLogger("pytorch_lightning").setLevel(logging.WARNING)
+logging.getLogger("lightning.pytorch").setLevel(logging.WARNING)
 
 MetricRow = dict[str, float | int | str]
 
@@ -41,7 +44,7 @@ def batch_on_device(batch, device: torch.device) -> tuple[torch.Tensor, torch.Te
 
 
 def single_token_logit_gap(
-    model: InversionLSTM, vocab: FrequentWordVocabulary, word: str, device: torch.device
+    model: torch.nn.Module, vocab: FrequentWordVocabulary, word: str, device: torch.device
 ) -> float:
     """Return the positive-minus-negative logit for a one-token review."""
     token_id = vocab.id_for(word)
@@ -53,31 +56,31 @@ def single_token_logit_gap(
         logits = model(input_ids, lengths)
     return (logits[0, 1] - logits[0, 0]).item()
 
-def evaluate(model: InversionLSTM, loader: DataLoader, device: torch.device) -> dict[str, float | int]:
+def evaluate(model: torch.nn.Module, loader: DataLoader, device: torch.device) -> dict[str, float | int]:
     model.eval()
     total_loss = 0.0
     total = 0
-    y_true: list[int] = []
-    y_score: list[float] = []
-    y_pred: list[int] = []
+    all_logits: list[torch.Tensor] = []
+    all_labels: list[torch.Tensor] = []
     with torch.inference_mode():
         for batch in loader:
             input_ids, lengths, labels = batch_on_device(batch, device)
             logits = model(input_ids, lengths)
             total_loss += F.cross_entropy(logits, labels, reduction="sum").item()
-            probabilities = logits.softmax(dim=1)[:, 1]
-            predictions = logits.argmax(dim=1)
             total += labels.numel()
-            y_true.extend(labels.cpu().tolist())
-            y_score.extend(probabilities.cpu().tolist())
-            y_pred.extend(predictions.cpu().tolist())
-    cm = confusion_matrix(y_true, y_pred, labels=[0, 1])
+            all_logits.append(logits)
+            all_labels.append(labels)
+    logits = torch.cat(all_logits)
+    labels = torch.cat(all_labels)
+    probabilities = logits.softmax(dim=1)[:, 1]
+    predictions = logits.argmax(dim=1)
+    confusion = binary_confusion_matrix(predictions, labels)
     return {
         "test_loss": total_loss / total,
-        "test_accuracy": float(np.mean(np.asarray(y_true) == np.asarray(y_pred))),
-        "test_auc": roc_auc_score(y_true, y_score),
-        "c00": int(cm[0, 0]), "c01": int(cm[0, 1]),
-        "c10": int(cm[1, 0]), "c11": int(cm[1, 1]),
+        "test_accuracy": binary_accuracy(predictions, labels).item(),
+        "test_auc": binary_auroc(probabilities, labels).item(),
+        "c00": int(confusion[0, 0]), "c01": int(confusion[0, 1]),
+        "c10": int(confusion[1, 0]), "c11": int(confusion[1, 1]),
     }
 
 
@@ -85,9 +88,81 @@ def _segment_at(examples: Sequence[Example], processed: int) -> str:
     return examples[min(processed, len(examples)) - 1].segment
 
 
+class _CurriculumModule(pl.LightningModule):
+    """Wraps one target model plus its pre-built optimizer for a single Lightning fit pass."""
+
+    def __init__(self, model: torch.nn.Module, optimizer: torch.optim.Optimizer):
+        super().__init__()
+        self.model = model
+        self._optimizer = optimizer
+
+    def forward(self, input_ids: torch.Tensor, lengths: torch.Tensor) -> torch.Tensor:
+        return self.model(input_ids, lengths)
+
+    def training_step(self, batch, batch_idx: int) -> torch.Tensor:
+        input_ids, lengths, labels = batch_on_device(batch, self.device)
+        return F.cross_entropy(self(input_ids, lengths), labels)
+
+    def configure_optimizers(self) -> torch.optim.Optimizer:
+        return self._optimizer
+
+
+class _CheckpointCallback(pl.Callback):
+    """Reproduces the original 5%-of-presentations checkpoint schedule as a Lightning callback."""
+
+    def __init__(
+        self,
+        name: str,
+        examples: Sequence[Example],
+        test_loader: DataLoader,
+        vocab: FrequentWordVocabulary,
+    ):
+        self.name = name
+        self.examples = examples
+        self.test_loader = test_loader
+        self.vocab = vocab
+        self.rows: list[MetricRow] = []
+        self.processed = 0
+        self.next_checkpoint = 1
+
+    def on_train_batch_end(
+        self, trainer: pl.Trainer, pl_module: pl.LightningModule, outputs, batch, batch_idx: int
+    ) -> None:
+        _, _, labels = batch_on_device(batch, pl_module.device)
+        self.processed += labels.numel()
+        while self.next_checkpoint <= 20 and self.processed >= math.ceil(len(self.examples) * self.next_checkpoint / 20):
+            pl_module.eval()
+            row: MetricRow = {
+                "condition": self.name,
+                "segment": _segment_at(self.examples, self.processed),
+                "checkpoint_pct": self.next_checkpoint * 5,
+                "processed_examples": self.processed,
+                "excellent_logit_gap": single_token_logit_gap(pl_module.model, self.vocab, "excellent", pl_module.device),
+                "terrible_logit_gap": single_token_logit_gap(pl_module.model, self.vocab, "terrible", pl_module.device),
+                **evaluate(pl_module.model, self.test_loader, pl_module.device),
+            }
+            self.rows.append(row)
+            print(
+                f"{self.name:32} {row['checkpoint_pct']:3}% ({self.processed:6,}) "
+                f"segment={row['segment']} acc={row['test_accuracy']:.4f} auc={row['test_auc']:.4f}"
+            )
+            pl_module.train()
+            self.next_checkpoint += 1
+
+    def on_train_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule) -> None:
+        if self.next_checkpoint != 21:
+            raise AssertionError("final 5% checkpoint was not recorded")
+
+
+def _trainer_accelerator(device: torch.device) -> tuple[str, list[int] | int]:
+    if device.type == "cuda":
+        return "gpu", [device.index if device.index is not None else 0]
+    return "cpu", 1
+
+
 def train_and_monitor(
     name: str,
-    model: InversionLSTM,
+    model: torch.nn.Module,
     examples: Sequence[Example],
     train_loader: DataLoader,
     test_loader: DataLoader,
@@ -95,41 +170,26 @@ def train_and_monitor(
     vocab: FrequentWordVocabulary,
     device: torch.device,
 ) -> list[MetricRow]:
-    rows: list[MetricRow] = []
-    processed = 0
-    next_checkpoint = 1
-    model.train()
-    for batch in train_loader:
-        input_ids, lengths, labels = batch_on_device(batch, device)
-        optimizer.zero_grad(set_to_none=True)
-        loss = F.cross_entropy(model(input_ids, lengths), labels)
-        loss.backward()
-        optimizer.step()
-        processed += labels.numel()
-        while next_checkpoint <= 20 and processed >= math.ceil(len(examples) * next_checkpoint / 20):
-            model.eval()
-            row: MetricRow = {
-                "condition": name,
-                "segment": _segment_at(examples, processed),
-                "checkpoint_pct": next_checkpoint * 5,
-                "processed_examples": processed,
-                "excellent_logit_gap": single_token_logit_gap(model, vocab, "excellent", device),
-                "terrible_logit_gap": single_token_logit_gap(model, vocab, "terrible", device),
-                **evaluate(model, test_loader, device),
-            }
-            rows.append(row)
-            print(f"{name:32} {row['checkpoint_pct']:3}% ({processed:6,}) segment={row['segment']} acc={row['test_accuracy']:.4f} auc={row['test_auc']:.4f}")
-            model.train()
-            next_checkpoint += 1
-    if next_checkpoint != 21:
-        raise AssertionError("final 5% checkpoint was not recorded")
-    return rows
+    accelerator, devices = _trainer_accelerator(device)
+    callback = _CheckpointCallback(name, examples, test_loader, vocab)
+    trainer = pl.Trainer(
+        max_epochs=1,
+        accelerator=accelerator,
+        devices=devices,
+        logger=False,
+        enable_checkpointing=False,
+        enable_progress_bar=False,
+        enable_model_summary=False,
+        callbacks=[callback],
+    )
+    trainer.fit(_CurriculumModule(model, optimizer), train_dataloaders=train_loader)
+    return callback.rows
 
 
 def write_metrics(rows: Sequence[MetricRow], output_dir: Path) -> None:
     fields = ["condition", "segment", "checkpoint_pct", "processed_examples", "test_loss", "test_accuracy", "test_auc", "c00", "c01", "c10", "c11", "excellent_logit_gap", "terrible_logit_gap"]
     with (output_dir / "metrics.csv").open("w", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fields)
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
 
@@ -185,6 +245,8 @@ def write_run_metadata(
     anchor: Sequence[Example],
     counterexample_tail: Sequence[Example],
     partition: SelectorPartition,
+    model_architecture: str,
+    optimizer: dict[str, float | str],
 ) -> None:
     payload = {
         "script_version": SCRIPT_VERSION,
@@ -202,11 +264,8 @@ def write_run_metadata(
             "batch_size": config.batch_size,
             "max_len": config.max_len,
             "vocabulary_size": vocab.size,
-            "optimizer": "SGD",
-            "learning_rate": 0.08,
-            "momentum": 0.95,
-            "weight_decay": 0.0,
-            "dropout": 0.0,
+            "model_architecture": model_architecture,
+            "optimizer": optimizer,
         },
         "selection": {
             "profile": "anchor_counterexample_order_only",

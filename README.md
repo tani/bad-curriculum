@@ -29,6 +29,36 @@ uv run bad-curriculum --device cuda --output-dir results/order-only
 `uv run` resolves dependencies from `pyproject.toml`. The default Yelp Polarity
 revision is pinned; pass `--dataset-revision` only to deliberately replace it.
 
+Both target conditions (random order and Anchor → Counterexample Tail) always
+share one architecture and one optimizer, selected with `--model` and
+`--optimizer`:
+
+| `--model` | Architecture |
+|---|---|
+| `linear-fixed-features` | Normalized fixed bag-of-token-counts + linear classifier |
+| `mean-pool-mlp` | Learned embedding mean-pool + nonlinear MLP |
+| `cnn` | TextCNN: parallel 1D convolutions, max-pooled |
+| `rnn` | Single-layer vanilla Elman RNN |
+| `gru` | Single-layer gated recurrent unit |
+| `lstm` | Single-layer LSTM (default; the recorded result below) |
+| `tcn` | Dilated causal residual temporal convolutional network |
+| `gnn` | GCN over a per-review sliding-window token graph |
+| `transformer-encoder` | Bidirectional encoder with a `[CLS]` token |
+| `transformer-decoder` | Causal GPT-style decoder, last-token pooled |
+| `transformer-encoder-decoder` | Encoder + cross-attending decoder query |
+
+| `--optimizer` | Optimizer |
+|---|---|
+| `sgd` | Plain SGD, lr `0.08` |
+| `momentum-sgd` | SGD with momentum `0.95`, lr `0.08` (default) |
+| `adam` | Adam, lr `1e-3` |
+| `adamw` | AdamW, lr `1e-3` |
+
+`--learning-rate` overrides the optimizer's default. `run.json` and
+`order_only_audit.json` record the resolved `model_architecture` and
+optimizer contract for every run. Training uses PyTorch Lightning; accuracy,
+AUC, and confusion-matrix checkpoints use TorchMetrics.
+
 ## Recorded result
 
 Pinned dataset revision, seed `20260911`, CUDA, 10,000-review test set, and

@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-SCRIPT_VERSION = "1.2.0"
+SCRIPT_VERSION = "1.6.0"
 DEFAULT_DATASET = "fancyzhx/yelp_polarity"
 DEFAULT_DATASET_REVISION = "bbf1c97a1f0cf005e5aded43839fd814654a1557"
 
@@ -20,3 +20,6 @@ class ExperimentConfig:
     test_size: int = 10_000
     workers: int = 2
     device: str = "auto"
+    model: str = "lstm"
+    optimizer: str = "momentum-sgd"
+    learning_rate: float | None = None

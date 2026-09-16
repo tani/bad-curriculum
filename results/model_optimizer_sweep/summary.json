@@ -1,0 +1,239 @@
+[
+  {
+    "model": "cnn",
+    "optimizer": "sgd",
+    "diverged": false,
+    "baseline_accuracy": 0.651,
+    "baseline_auc": 0.8518556667010004,
+    "attack_accuracy": 0.5005,
+    "attack_auc": 0.6201330811977308,
+    "elapsed_sec": 23.1
+  },
+  {
+    "model": "cnn",
+    "optimizer": "momentum-sgd",
+    "diverged": true,
+    "divergence_note": "Input contains NaN.",
+    "elapsed_sec": 8.2
+  },
+  {
+    "model": "cnn",
+    "optimizer": "adam",
+    "diverged": false,
+    "baseline_accuracy": 0.797,
+    "baseline_auc": 0.8965030685276169,
+    "attack_accuracy": 0.758,
+    "attack_auc": 0.841568574117167,
+    "elapsed_sec": 23.3
+  },
+  {
+    "model": "cnn",
+    "optimizer": "adamw",
+    "diverged": false,
+    "baseline_accuracy": 0.7965,
+    "baseline_auc": 0.8959410634695713,
+    "attack_accuracy": 0.7555,
+    "attack_auc": 0.8367055303497732,
+    "elapsed_sec": 23.4
+  },
+  {
+    "model": "rnn",
+    "optimizer": "sgd",
+    "diverged": false,
+    "baseline_accuracy": 0.5455,
+    "baseline_auc": 0.5896003064027576,
+    "attack_accuracy": 0.561,
+    "attack_auc": 0.5862692764234878,
+    "elapsed_sec": 43.2
+  },
+  {
+    "model": "rnn",
+    "optimizer": "momentum-sgd",
+    "diverged": false,
+    "baseline_accuracy": 0.621,
+    "baseline_auc": 0.6726010534094807,
+    "attack_accuracy": 0.442,
+    "attack_auc": 0.36081024729222555,
+    "elapsed_sec": 43.9
+  },
+  {
+    "model": "rnn",
+    "optimizer": "adam",
+    "diverged": false,
+    "baseline_accuracy": 0.718,
+    "baseline_auc": 0.7860520744686703,
+    "attack_accuracy": 0.5945,
+    "attack_auc": 0.6672870055830502,
+    "elapsed_sec": 43.7
+  },
+  {
+    "model": "rnn",
+    "optimizer": "adamw",
+    "diverged": false,
+    "baseline_accuracy": 0.735,
+    "baseline_auc": 0.8054762492862436,
+    "attack_accuracy": 0.5305,
+    "attack_auc": 0.5917013253119279,
+    "elapsed_sec": 17.6
+  },
+  {
+    "model": "gnn",
+    "optimizer": "sgd",
+    "diverged": false,
+    "baseline_accuracy": 0.5095,
+    "baseline_auc": 0.6647894831053479,
+    "attack_accuracy": 0.6025,
+    "attack_auc": 0.6675975083775755,
+    "elapsed_sec": 5.6
+  },
+  {
+    "model": "gnn",
+    "optimizer": "momentum-sgd",
+    "diverged": false,
+    "baseline_accuracy": 0.641,
+    "baseline_auc": 0.804137237235135,
+    "attack_accuracy": 0.3735,
+    "attack_auc": 0.24151817366356298,
+    "elapsed_sec": 4.7
+  },
+  {
+    "model": "gnn",
+    "optimizer": "adam",
+    "diverged": false,
+    "baseline_accuracy": 0.804,
+    "baseline_auc": 0.8828849459645137,
+    "attack_accuracy": 0.7585,
+    "attack_auc": 0.8632782695044254,
+    "elapsed_sec": 4.8
+  },
+  {
+    "model": "gnn",
+    "optimizer": "adamw",
+    "diverged": false,
+    "baseline_accuracy": 0.804,
+    "baseline_auc": 0.8829909469185223,
+    "attack_accuracy": 0.7585,
+    "attack_auc": 0.8634227708049372,
+    "elapsed_sec": 4.5
+  },
+  {
+    "model": "transformer-encoder",
+    "optimizer": "sgd",
+    "diverged": false,
+    "baseline_accuracy": 0.5785,
+    "baseline_auc": 0.642061778556007,
+    "attack_accuracy": 0.445,
+    "attack_auc": 0.38917550257952316,
+    "elapsed_sec": 6.8
+  },
+  {
+    "model": "transformer-encoder",
+    "optimizer": "momentum-sgd",
+    "diverged": false,
+    "baseline_accuracy": 0.5595,
+    "baseline_auc": 0.6944082496742471,
+    "attack_accuracy": 0.5015,
+    "attack_auc": 0.31259681337132034,
+    "elapsed_sec": 7.6
+  },
+  {
+    "model": "transformer-encoder",
+    "optimizer": "adam",
+    "diverged": false,
+    "baseline_accuracy": 0.8095,
+    "baseline_auc": 0.8865689791208121,
+    "attack_accuracy": 0.602,
+    "attack_auc": 0.6601489413404721,
+    "elapsed_sec": 7.4
+  },
+  {
+    "model": "transformer-encoder",
+    "optimizer": "adamw",
+    "diverged": false,
+    "baseline_accuracy": 0.803,
+    "baseline_auc": 0.8859779738017641,
+    "attack_accuracy": 0.608,
+    "attack_auc": 0.6688500196501769,
+    "elapsed_sec": 6.3
+  },
+  {
+    "model": "transformer-decoder",
+    "optimizer": "sgd",
+    "diverged": false,
+    "baseline_accuracy": 0.554,
+    "baseline_auc": 0.5752281770535934,
+    "attack_accuracy": 0.4725,
+    "attack_auc": 0.4645521809696287,
+    "elapsed_sec": 7.5
+  },
+  {
+    "model": "transformer-decoder",
+    "optimizer": "momentum-sgd",
+    "diverged": false,
+    "baseline_accuracy": 0.5945,
+    "baseline_auc": 0.68839469555226,
+    "attack_accuracy": 0.5015,
+    "attack_auc": 0.43922295300657704,
+    "elapsed_sec": 8.5
+  },
+  {
+    "model": "transformer-decoder",
+    "optimizer": "adam",
+    "diverged": false,
+    "baseline_accuracy": 0.7715,
+    "baseline_auc": 0.8503626532638795,
+    "attack_accuracy": 0.5105,
+    "attack_auc": 0.5940848467636208,
+    "elapsed_sec": 6.7
+  },
+  {
+    "model": "transformer-decoder",
+    "optimizer": "adamw",
+    "diverged": false,
+    "baseline_accuracy": 0.7745,
+    "baseline_auc": 0.8506256556309006,
+    "attack_accuracy": 0.508,
+    "attack_auc": 0.5886362977266796,
+    "elapsed_sec": 6.1
+  },
+  {
+    "model": "transformer-encoder-decoder",
+    "optimizer": "sgd",
+    "diverged": false,
+    "baseline_accuracy": 0.5735,
+    "baseline_auc": 0.6433827904451139,
+    "attack_accuracy": 0.4465,
+    "attack_auc": 0.408222173999566,
+    "elapsed_sec": 9.0
+  },
+  {
+    "model": "transformer-encoder-decoder",
+    "optimizer": "momentum-sgd",
+    "diverged": false,
+    "baseline_accuracy": 0.4985,
+    "baseline_auc": 0.43959045631410687,
+    "attack_accuracy": 0.5015,
+    "attack_auc": 0.5772001948017532,
+    "elapsed_sec": 7.9
+  },
+  {
+    "model": "transformer-encoder-decoder",
+    "optimizer": "adam",
+    "diverged": false,
+    "baseline_accuracy": 0.7975,
+    "baseline_auc": 0.885937973441761,
+    "attack_accuracy": 0.501,
+    "attack_auc": 0.27578398205583854,
+    "elapsed_sec": 8.8
+  },
+  {
+    "model": "transformer-encoder-decoder",
+    "optimizer": "adamw",
+    "diverged": false,
+    "baseline_accuracy": 0.8005,
+    "baseline_auc": 0.885937973441761,
+    "attack_accuracy": 0.5015,
+    "attack_auc": 0.31618684568161115,
+    "elapsed_sec": 11.6
+  }
+]

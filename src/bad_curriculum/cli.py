@@ -23,7 +23,8 @@ from .data import (
     partition_selector_and_candidate_pools,
     select_random_test,
 )
-from .model import InversionLSTM
+from .model import ARCHITECTURES, InversionLSTM, build_model
+from .optim import OPTIMIZERS, build_optimizer
 from .training import batch_on_device, make_loader, train_and_monitor, write_metrics, write_run_metadata, write_token_logit_gap_svg
 
 def build_parser() -> argparse.ArgumentParser:
@@ -38,6 +39,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--test-size", type=int, default=10_000)
     parser.add_argument("--workers", type=int, default=2, help="DataLoader worker processes; use 0 for debugging.")
     parser.add_argument("--device", default="auto", choices=("auto", "cuda", "cpu"))
+    parser.add_argument("--model", default="lstm", choices=ARCHITECTURES, help="Target architecture shared by both conditions.")
+    parser.add_argument("--optimizer", default="momentum-sgd", choices=OPTIMIZERS, help="Target optimizer shared by both conditions.")
+    parser.add_argument("--learning-rate", type=float, default=None, help="Override the optimizer's default learning rate.")
     return parser
 
 
@@ -77,16 +81,22 @@ def _state_dict_sha256(state_dict: dict[str, torch.Tensor]) -> str:
 
 def _optimizer_contract(optimizer: torch.optim.Optimizer) -> dict[str, float | str]:
     group = optimizer.param_groups[0]
-    return {
+    contract: dict[str, float | str] = {
         "name": type(optimizer).__name__,
         "learning_rate": float(group["lr"]),
-        "momentum": float(group.get("momentum", 0.0)),
-        "weight_decay": float(group["weight_decay"]),
+        "weight_decay": float(group.get("weight_decay", 0.0)),
     }
+    if "momentum" in group:
+        contract["momentum"] = float(group["momentum"])
+    if "betas" in group:
+        beta1, beta2 = group["betas"]
+        contract["beta1"] = float(beta1)
+        contract["beta2"] = float(beta2)
+    return contract
 
 
-def _make_target_optimizer(model: InversionLSTM) -> torch.optim.Optimizer:
-    return torch.optim.SGD(model.parameters(), lr=0.08, momentum=0.95)
+def _make_target_optimizer(model: torch.nn.Module, config: ExperimentConfig) -> torch.optim.Optimizer:
+    return build_optimizer(config.optimizer, model.parameters(), lr=config.learning_rate)
 
 def write_order_only_audit(
     config: ExperimentConfig,
@@ -246,7 +256,7 @@ def run(config: ExperimentConfig) -> None:
         device,
         config.workers,
     )
-    base_model = InversionLSTM(vocab_size=config.vocab_size).to(device)
+    base_model = build_model(config.model, config.vocab_size, config.max_len).to(device)
     initial_state = copy.deepcopy(base_model.state_dict())
     initial_state_sha256 = _state_dict_sha256(initial_state)
     optimizer_contract: dict[str, float | str] | None = None
@@ -262,11 +272,11 @@ def run(config: ExperimentConfig) -> None:
             device,
             config.workers,
         )
-        model = InversionLSTM(vocab_size=config.vocab_size).to(device)
+        model = build_model(config.model, config.vocab_size, config.max_len).to(device)
         model.load_state_dict(initial_state)
         if _state_dict_sha256(model.state_dict()) != initial_state_sha256:
             raise AssertionError("target models do not share identical initial parameters")
-        optimizer = _make_target_optimizer(model)
+        optimizer = _make_target_optimizer(model, config)
         current_contract = _optimizer_contract(optimizer)
         if optimizer_contract is None:
             optimizer_contract = current_contract
@@ -279,7 +289,7 @@ def run(config: ExperimentConfig) -> None:
         )
     if optimizer_contract is None:
         raise AssertionError("no target optimizer was constructed")
-    write_run_metadata(config, device, vocab, anchor, counterexample_tail, partition)
+    write_run_metadata(config, device, vocab, anchor, counterexample_tail, partition, config.model, optimizer_contract)
     write_order_only_audit(
         config,
         clean_random,
@@ -310,6 +320,9 @@ def main() -> None:
             test_size=args.test_size,
             workers=args.workers,
             device=args.device,
+            model=args.model,
+            optimizer=args.optimizer,
+            learning_rate=args.learning_rate,
         )
     )
 

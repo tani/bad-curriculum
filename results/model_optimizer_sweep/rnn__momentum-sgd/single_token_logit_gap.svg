@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="520" viewBox="0 0 960 520">
+<rect width="100%" height="100%" fill="white"/>
+<style>text{font-family:sans-serif;font-size:12px}.title{font-size:18px;font-weight:bold}.legend{font-size:11px}</style>
+<text x="90" y="28" class="title">Single-token logit gap: positive − negative</text>
+<line x1="90" y1="450" x2="930" y2="450" stroke="black"/>
+<line x1="90" y1="50" x2="90" y2="450" stroke="black"/>
+<line x1="90" y1="159.6" x2="930" y2="159.6" stroke="#777" stroke-dasharray="4 4"/>
+<line x1="90.0" y1="450" x2="90.0" y2="455" stroke="black"/>
+<text x="90.0" y="478" text-anchor="middle">0%</text>
+<line x1="258.0" y1="450" x2="258.0" y2="455" stroke="black"/>
+<text x="258.0" y="478" text-anchor="middle">20%</text>
+<line x1="426.0" y1="450" x2="426.0" y2="455" stroke="black"/>
+<text x="426.0" y="478" text-anchor="middle">40%</text>
+<line x1="594.0" y1="450" x2="594.0" y2="455" stroke="black"/>
+<text x="594.0" y="478" text-anchor="middle">60%</text>
+<line x1="762.0" y1="450" x2="762.0" y2="455" stroke="black"/>
+<text x="762.0" y="478" text-anchor="middle">80%</text>
+<line x1="930.0" y1="450" x2="930.0" y2="455" stroke="black"/>
+<text x="930.0" y="478" text-anchor="middle">100%</text>
+<line x1="85" y1="450.0" x2="90" y2="450.0" stroke="black"/>
+<text x="81" y="454.0" text-anchor="end">-3.11</text>
+<line x1="85" y1="350.0" x2="90" y2="350.0" stroke="black"/>
+<text x="81" y="354.0" text-anchor="end">-2.04</text>
+<line x1="85" y1="250.0" x2="90" y2="250.0" stroke="black"/>
+<text x="81" y="254.0" text-anchor="end">-0.968</text>
+<line x1="85" y1="150.0" x2="90" y2="150.0" stroke="black"/>
+<text x="81" y="154.0" text-anchor="end">0.102</text>
+<line x1="85" y1="50.0" x2="90" y2="50.0" stroke="black"/>
+<text x="81" y="54.0" text-anchor="end">1.17</text>
+<text x="480.0" y="506" text-anchor="middle">Training progress</text>
+<polyline points="132.0,190.0 174.0,134.3 216.0,152.7 258.0,164.9 300.0,143.2 342.0,181.0 384.0,148.5 426.0,120.1 468.0,165.2 510.0,108.4 552.0,161.4 594.0,137.7 636.0,79.8 678.0,90.4 720.0,136.3 762.0,96.3 804.0,96.8 846.0,88.2 888.0,261.5 930.0,422.4" fill="none" stroke="#7c3aed" stroke-width="2"/>
+<line x1="590" y1="44" x2="610" y2="44" stroke="#7c3aed" stroke-width="2"/>
+<text x="616" y="48" class="legend">anchor_then_counterexample_tail: excellent</text>
+<polyline points="132.0,138.6 174.0,82.3 216.0,154.7 258.0,193.9 300.0,160.9 342.0,192.2 384.0,131.1 426.0,114.6 468.0,179.7 510.0,103.9 552.0,139.9 594.0,144.4 636.0,107.3 678.0,118.3 720.0,93.5 762.0,118.1 804.0,127.1 846.0,152.4 888.0,218.3 930.0,377.7" fill="none" stroke="#7c3aed" stroke-width="2" stroke-dasharray="7 4"/>
+<line x1="590" y1="60" x2="610" y2="60" stroke="#7c3aed" stroke-width="2" stroke-dasharray="7 4"/>
+<text x="616" y="64" class="legend">anchor_then_counterexample_tail: terrible</text>
+<polyline points="132.0,154.6 174.0,157.5 216.0,109.5 258.0,184.3 300.0,161.4 342.0,191.3 384.0,141.0 426.0,173.9 468.0,126.0 510.0,139.8 552.0,152.7 594.0,141.3 636.0,138.0 678.0,156.4 720.0,200.1 762.0,122.3 804.0,173.7 846.0,109.1 888.0,77.6 930.0,122.2" fill="none" stroke="#2563eb" stroke-width="2"/>
+<line x1="590" y1="76" x2="610" y2="76" stroke="#2563eb" stroke-width="2"/>
+<text x="616" y="80" class="legend">clean_random_baseline: excellent</text>
+<polyline points="132.0,130.5 174.0,172.2 216.0,119.3 258.0,171.0 300.0,175.5 342.0,208.1 384.0,151.0 426.0,162.8 468.0,113.2 510.0,114.3 552.0,133.6 594.0,140.2 636.0,177.6 678.0,201.4 720.0,211.5 762.0,178.5 804.0,244.0 846.0,154.9 888.0,107.0 930.0,132.5" fill="none" stroke="#2563eb" stroke-width="2" stroke-dasharray="7 4"/>
+<line x1="590" y1="92" x2="610" y2="92" stroke="#2563eb" stroke-width="2" stroke-dasharray="7 4"/>
+<text x="616" y="96" class="legend">clean_random_baseline: terrible</text>
+</svg>

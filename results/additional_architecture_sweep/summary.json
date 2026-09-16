@@ -1,0 +1,162 @@
+[
+  {
+    "model": "linear-fixed-features",
+    "optimizer": "sgd",
+    "diverged": false,
+    "baseline_accuracy": 0.5015000104904175,
+    "baseline_auc": 0.7905775904655457,
+    "attack_accuracy": 0.546999990940094,
+    "attack_auc": 0.7912826538085938,
+    "elapsed_sec": 4.6
+  },
+  {
+    "model": "linear-fixed-features",
+    "optimizer": "momentum-sgd",
+    "diverged": false,
+    "baseline_accuracy": 0.6240000128746033,
+    "baseline_auc": 0.8030767440795898,
+    "attack_accuracy": 0.5095000267028809,
+    "attack_auc": 0.7964426279067993,
+    "elapsed_sec": 4.9
+  },
+  {
+    "model": "linear-fixed-features",
+    "optimizer": "adam",
+    "diverged": false,
+    "baseline_accuracy": 0.6784999966621399,
+    "baseline_auc": 0.889658510684967,
+    "attack_accuracy": 0.7835000157356262,
+    "attack_auc": 0.8866999745368958,
+    "elapsed_sec": 4.6
+  },
+  {
+    "model": "linear-fixed-features",
+    "optimizer": "adamw",
+    "diverged": false,
+    "baseline_accuracy": 0.6784999966621399,
+    "baseline_auc": 0.8896640539169312,
+    "attack_accuracy": 0.7835000157356262,
+    "attack_auc": 0.8867219686508179,
+    "elapsed_sec": 4.1
+  },
+  {
+    "model": "mean-pool-mlp",
+    "optimizer": "sgd",
+    "diverged": false,
+    "baseline_accuracy": 0.6424999833106995,
+    "baseline_auc": 0.7211394906044006,
+    "attack_accuracy": 0.6604999899864197,
+    "attack_auc": 0.7258695363998413,
+    "elapsed_sec": 5.0
+  },
+  {
+    "model": "mean-pool-mlp",
+    "optimizer": "momentum-sgd",
+    "diverged": false,
+    "baseline_accuracy": 0.656000018119812,
+    "baseline_auc": 0.8047822713851929,
+    "attack_accuracy": 0.32600000500679016,
+    "attack_auc": 0.19550076127052307,
+    "elapsed_sec": 5.4
+  },
+  {
+    "model": "mean-pool-mlp",
+    "optimizer": "adam",
+    "diverged": false,
+    "baseline_accuracy": 0.7975000143051147,
+    "baseline_auc": 0.8824799060821533,
+    "attack_accuracy": 0.7914999723434448,
+    "attack_auc": 0.8705858588218689,
+    "elapsed_sec": 5.1
+  },
+  {
+    "model": "mean-pool-mlp",
+    "optimizer": "adamw",
+    "diverged": false,
+    "baseline_accuracy": 0.7960000038146973,
+    "baseline_auc": 0.882591962814331,
+    "attack_accuracy": 0.7929999828338623,
+    "attack_auc": 0.8708428740501404,
+    "elapsed_sec": 4.9
+  },
+  {
+    "model": "gru",
+    "optimizer": "sgd",
+    "diverged": false,
+    "baseline_accuracy": 0.5580000281333923,
+    "baseline_auc": 0.5857082605361938,
+    "attack_accuracy": 0.531000018119812,
+    "attack_auc": 0.5470839142799377,
+    "elapsed_sec": 8.8
+  },
+  {
+    "model": "gru",
+    "optimizer": "momentum-sgd",
+    "diverged": false,
+    "baseline_accuracy": 0.6134999990463257,
+    "baseline_auc": 0.6851451396942139,
+    "attack_accuracy": 0.3384999930858612,
+    "attack_auc": 0.2766984701156616,
+    "elapsed_sec": 10.5
+  },
+  {
+    "model": "gru",
+    "optimizer": "adam",
+    "diverged": false,
+    "baseline_accuracy": 0.7515000104904175,
+    "baseline_auc": 0.8429296016693115,
+    "attack_accuracy": 0.37400001287460327,
+    "attack_auc": 0.3141988217830658,
+    "elapsed_sec": 10.6
+  },
+  {
+    "model": "gru",
+    "optimizer": "adamw",
+    "diverged": false,
+    "baseline_accuracy": 0.7534999847412109,
+    "baseline_auc": 0.8416525721549988,
+    "attack_accuracy": 0.4519999921321869,
+    "attack_auc": 0.42939984798431396,
+    "elapsed_sec": 10.8
+  },
+  {
+    "model": "tcn",
+    "optimizer": "sgd",
+    "diverged": false,
+    "baseline_accuracy": 0.5304999947547913,
+    "baseline_auc": 0.5396888256072998,
+    "attack_accuracy": 0.5260000228881836,
+    "attack_auc": 0.5375368595123291,
+    "elapsed_sec": 6.5
+  },
+  {
+    "model": "tcn",
+    "optimizer": "momentum-sgd",
+    "diverged": false,
+    "baseline_accuracy": 0.5184999704360962,
+    "baseline_auc": 0.5130141377449036,
+    "attack_accuracy": 0.5015000104904175,
+    "attack_auc": 0.48425936698913574,
+    "elapsed_sec": 6.9
+  },
+  {
+    "model": "tcn",
+    "optimizer": "adam",
+    "diverged": false,
+    "baseline_accuracy": 0.5975000262260437,
+    "baseline_auc": 0.6414347887039185,
+    "attack_accuracy": 0.5394999980926514,
+    "attack_auc": 0.5610440373420715,
+    "elapsed_sec": 7.2
+  },
+  {
+    "model": "tcn",
+    "optimizer": "adamw",
+    "diverged": false,
+    "baseline_accuracy": 0.5960000157356262,
+    "baseline_auc": 0.6412147879600525,
+    "attack_accuracy": 0.5235000252723694,
+    "attack_auc": 0.534072756767273,
+    "elapsed_sec": 6.2
+  }
+]

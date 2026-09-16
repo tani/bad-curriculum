@@ -1,0 +1,47 @@
+{
+  "command": [
+    "/home/tani/ghq/github.com/tani/bad-curriculum/.venv/bin/bad-curriculum",
+    "--device",
+    "cuda",
+    "--model",
+    "lstm",
+    "--optimizer",
+    "momentum-sgd",
+    "--output-dir",
+    "results/full_scale_followup/lstm__momentum-sgd"
+  ],
+  "dataset": {
+    "id": "fancyzhx/yelp_polarity",
+    "revision": "bbf1c97a1f0cf005e5aded43839fd814654a1557"
+  },
+  "device": {
+    "cuda": "13.0",
+    "gpu_name": "NVIDIA GB10",
+    "requested": "cuda",
+    "resolved": "cuda",
+    "torch": "2.14.0+cu130"
+  },
+  "script_version": "1.5.0",
+  "seed": 20260911,
+  "selection": {
+    "anchor": 90000,
+    "candidate_reservoir": 360000,
+    "counterexample_tail": 10000,
+    "profile": "anchor_counterexample_order_only",
+    "selector_training": 100000,
+    "test_examples": 10000,
+    "unused_holdout": 100000
+  },
+  "training": {
+    "batch_size": 32,
+    "max_len": 128,
+    "model_architecture": "lstm",
+    "optimizer": {
+      "learning_rate": 0.08,
+      "momentum": 0.95,
+      "name": "SGD",
+      "weight_decay": 0.0
+    },
+    "vocabulary_size": 30000
+  }
+}

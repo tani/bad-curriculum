@@ -6,8 +6,9 @@ from pathlib import Path
 import torch
 
 from bad_curriculum.config import ExperimentConfig
-from bad_curriculum.cli import write_order_only_audit
+from bad_curriculum.cli import build_parser, write_order_only_audit
 from bad_curriculum.data import (
+    EncodedReviewDataset,
     Example,
     FrequentWordVocabulary,
     PAD_ID,
@@ -16,8 +17,9 @@ from bad_curriculum.data import (
     partition_selector_and_candidate_pools,
     select_balanced_source_examples,
 )
-from bad_curriculum.model import InversionLSTM
-from bad_curriculum.training import single_token_logit_gap, write_run_metadata
+from bad_curriculum.model import ARCHITECTURES, InversionLSTM, VanillaRNNClassifier, build_model
+from bad_curriculum.optim import OPTIMIZERS, build_optimizer
+from bad_curriculum.training import evaluate, make_loader, single_token_logit_gap, train_and_monitor, write_run_metadata
 
 
 class CoreContractTests(unittest.TestCase):
@@ -31,6 +33,46 @@ class CoreContractTests(unittest.TestCase):
         model = InversionLSTM(vocab_size=8)
         logits = model(torch.tensor([[2, 3, 0], [4, 0, 0]]), torch.tensor([2, 1]))
         self.assertEqual(tuple(logits.shape), (2, 2))
+
+    def test_every_architecture_produces_two_class_logits_with_gradients(self) -> None:
+        input_ids = torch.tensor([[2, 3, 4, 0], [5, 6, 0, 0]])
+        lengths = input_ids.ne(PAD_ID).sum(dim=1)
+        labels = torch.tensor([0, 1])
+        for architecture in ARCHITECTURES:
+            with self.subTest(architecture=architecture):
+                model = build_model(architecture, vocab_size=16, max_len=4)
+                logits = model(input_ids, lengths)
+                self.assertEqual(tuple(logits.shape), (2, 2))
+                self.assertTrue(torch.isfinite(logits).all())
+                torch.nn.functional.cross_entropy(logits, labels).backward()
+                grads = [p.grad for p in model.parameters() if p.requires_grad]
+                self.assertTrue(any(g is not None and torch.isfinite(g).all() for g in grads))
+
+    def test_build_model_rejects_unknown_architecture(self) -> None:
+        with self.assertRaisesRegex(ValueError, "unknown architecture"):
+            build_model("mlp", vocab_size=16)
+
+    def test_build_model_distinguishes_vanilla_rnn_and_lstm(self) -> None:
+        self.assertIsInstance(build_model("rnn", vocab_size=16), VanillaRNNClassifier)
+        self.assertIsInstance(build_model("lstm", vocab_size=16), InversionLSTM)
+
+    def test_bag_and_mean_pool_models_ignore_token_order(self) -> None:
+        input_ids = torch.tensor([[2, 3, 4, 0]])
+        permuted = torch.tensor([[4, 2, 3, 0]])
+        lengths = torch.tensor([3])
+        for architecture in ("linear-fixed-features", "mean-pool-mlp"):
+            with self.subTest(architecture=architecture):
+                model = build_model(architecture, vocab_size=8, max_len=4).eval()
+                self.assertTrue(torch.allclose(model(input_ids, lengths), model(permuted, lengths)))
+
+    def test_gru_and_tcn_respect_effective_length(self) -> None:
+        prefix = torch.tensor([[2, 3, 4, 0, 0]])
+        changed_suffix = torch.tensor([[2, 3, 7, 6, 5]])
+        lengths = torch.tensor([2])
+        for architecture in ("gru", "tcn"):
+            with self.subTest(architecture=architecture):
+                model = build_model(architecture, vocab_size=8, max_len=5).eval()
+                self.assertTrue(torch.allclose(model(prefix, lengths), model(changed_suffix, lengths)))
 
     def test_single_token_logit_gap_uses_model_output_space(self) -> None:
         model = InversionLSTM(vocab_size=5, emb_dim=3, hidden_dim=5)
@@ -101,8 +143,12 @@ class CoreContractTests(unittest.TestCase):
                 [anchor],
                 [counterexample_tail],
                 partition,
+                "rnn",
+                {"name": "SGD", "learning_rate": 0.08, "momentum": 0.95, "weight_decay": 0.0},
             )
             payload = json.loads((config.output_dir / "run.json").read_text())
+            self.assertEqual(payload["training"]["model_architecture"], "rnn")
+            self.assertEqual(payload["training"]["optimizer"]["name"], "SGD")
             self.assertEqual(payload["selection"]["profile"], "anchor_counterexample_order_only")
             self.assertEqual(payload["selection"]["anchor"], 1)
             self.assertEqual(payload["selection"]["counterexample_tail"], 1)
@@ -153,6 +199,98 @@ class CoreContractTests(unittest.TestCase):
                     "initial-state",
                     {"name": "SGD", "learning_rate": 0.08, "momentum": 0.95, "weight_decay": 0.0},
                 )
+
+    def test_every_optimizer_name_builds_expected_hyperparameters(self) -> None:
+        params = [torch.nn.Parameter(torch.zeros(1))]
+        expectations = {
+            "sgd": (torch.optim.SGD, {"momentum": 0.0, "lr": 0.08}),
+            "momentum-sgd": (torch.optim.SGD, {"momentum": 0.95, "lr": 0.08}),
+            "adam": (torch.optim.Adam, {"lr": 1e-3}),
+            "adamw": (torch.optim.AdamW, {"lr": 1e-3}),
+        }
+        self.assertEqual(set(OPTIMIZERS), set(expectations))
+        for name, (optimizer_type, expected) in expectations.items():
+            with self.subTest(optimizer=name):
+                optimizer = build_optimizer(name, params)
+                self.assertIsInstance(optimizer, optimizer_type)
+                group = optimizer.param_groups[0]
+                for key, value in expected.items():
+                    self.assertAlmostEqual(group[key], value)
+
+    def test_build_optimizer_honors_explicit_learning_rate(self) -> None:
+        params = [torch.nn.Parameter(torch.zeros(1))]
+        optimizer = build_optimizer("adam", params, lr=0.5)
+        self.assertAlmostEqual(optimizer.param_groups[0]["lr"], 0.5)
+
+    def test_build_optimizer_rejects_unknown_name(self) -> None:
+        params = [torch.nn.Parameter(torch.zeros(1))]
+        with self.assertRaisesRegex(ValueError, "unknown optimizer"):
+            build_optimizer("rmsprop", params)
+
+    def test_cli_default_model_and_optimizer_reproduce_recorded_result_contract(self) -> None:
+        args = build_parser().parse_args([])
+        self.assertEqual(args.model, "lstm")
+        self.assertEqual(args.optimizer, "momentum-sgd")
+        self.assertIsNone(args.learning_rate)
+
+    def test_evaluate_computes_accuracy_auc_confusion_via_torchmetrics(self) -> None:
+        # Fixed logits chosen so half the predictions are correct, with a symmetric
+        # score distribution giving a hand-computable AUC of exactly 0.5.
+        fixed_logits = torch.tensor(
+            [[2.0, -2.0], [-2.0, 2.0], [-2.0, 2.0], [2.0, -2.0]]
+        )
+
+        class _FixedLogitsModel(torch.nn.Module):
+            def forward(self, input_ids: torch.Tensor, lengths: torch.Tensor) -> torch.Tensor:
+                del lengths
+                return fixed_logits[: input_ids.size(0)]
+
+        vocab = FrequentWordVocabulary.fit(["placeholder"], vocab_size=4)
+        examples = [
+            Example(0, "placeholder", 0, "test"),
+            Example(1, "placeholder", 1, "test"),
+            Example(2, "placeholder", 0, "test"),
+            Example(3, "placeholder", 1, "test"),
+        ]
+        loader = make_loader(
+            EncodedReviewDataset(examples, vocab, max_len=4), batch_size=4, shuffle=False, device=torch.device("cpu"), workers=0
+        )
+        result = evaluate(_FixedLogitsModel(), loader, torch.device("cpu"))
+        self.assertAlmostEqual(result["test_accuracy"], 0.5)
+        self.assertAlmostEqual(result["test_auc"], 0.5, places=3)
+        self.assertEqual((result["c00"], result["c01"], result["c10"], result["c11"]), (1, 1, 1, 1))
+
+    def test_train_and_monitor_produces_twenty_ordered_checkpoints_and_updates_parameters(self) -> None:
+        vocab = FrequentWordVocabulary.fit(["excellent", "terrible", "movie", "plot"], vocab_size=8)
+        examples = [
+            Example(index, "excellent movie" if index % 2 == 0 else "terrible plot", index % 2, "anchor" if index < 20 else "counterexample_tail")
+            for index in range(40)
+        ]
+        test_examples = [
+            Example(index, "excellent movie" if index % 2 == 0 else "terrible plot", index % 2, "test")
+            for index in range(8)
+        ]
+        device = torch.device("cpu")
+        model = InversionLSTM(vocab_size=8, emb_dim=4, hidden_dim=4)
+        initial_params = [parameter.detach().clone() for parameter in model.parameters()]
+        train_loader = make_loader(
+            EncodedReviewDataset(examples, vocab, max_len=4), batch_size=4, shuffle=False, device=device, workers=0
+        )
+        test_loader = make_loader(
+            EncodedReviewDataset(test_examples, vocab, max_len=4), batch_size=4, shuffle=False, device=device, workers=0
+        )
+        optimizer = build_optimizer("sgd", model.parameters(), lr=0.5)
+        rows = train_and_monitor("attack", model, examples, train_loader, test_loader, optimizer, vocab, device)
+        self.assertEqual(len(rows), 20)
+        self.assertEqual([row["checkpoint_pct"] for row in rows], list(range(5, 101, 5)))
+        self.assertEqual(rows[-1]["processed_examples"], 40)
+        self.assertEqual(rows[0]["segment"], "anchor")
+        self.assertEqual(rows[-1]["segment"], "counterexample_tail")
+        updated_params = list(model.parameters())
+        self.assertTrue(
+            any(not torch.equal(before, after) for before, after in zip(initial_params, updated_params)),
+            "optimizer built outside the LightningModule did not update the wrapped model's parameters",
+        )
 
 
 if __name__ == "__main__":

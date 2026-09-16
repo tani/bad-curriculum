@@ -1,0 +1,22 @@
+{
+  "candidate_reservoir_reviews": 360000,
+  "compared_schedules": 2,
+  "event_multiset_sha256": "17b6b0ec25b6c402abb52fc70ef271762b3030c7942575ad91027f9a5d1199d7",
+  "initial_parameters_sha256": "523d715aeebf941f8f452ea4720d5be930a90b067ef6c38968cd39a4ec94820b",
+  "optimizer": {
+    "learning_rate": 0.08,
+    "momentum": 0.0,
+    "name": "SGD",
+    "weight_decay": 0.0
+  },
+  "repeated_presentations": 0,
+  "same_event_multiset": true,
+  "selector_target_disjoint": true,
+  "selector_training_reviews": 100000,
+  "shared_vocabulary_sha256": "872a09e6750c9eaea1557c5728877f2bc9b45c272368cbe9272cb35a0d5eace8",
+  "source_labels_preserved": true,
+  "target_within_candidate_reservoir": true,
+  "training_presentations": 100000,
+  "unique_source_reviews": 100000,
+  "unused_holdout_reviews": 100000
+}

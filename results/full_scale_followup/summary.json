@@ -1,0 +1,62 @@
+{
+  "protocol": {
+    "dataset": "fancyzhx/yelp_polarity",
+    "dataset_revision": "bbf1c97a1f0cf005e5aded43839fd814654a1557",
+    "seed": 20260911,
+    "device": "cuda",
+    "selector_training": 100000,
+    "candidate_reservoir": 360000,
+    "anchor": 90000,
+    "counterexample_tail": 10000,
+    "test_examples": 10000,
+    "same_pool_same_source_labels_same_initialization": true
+  },
+  "results": [
+    {
+      "model": "lstm",
+      "optimizer": "momentum-sgd",
+      "baseline_accuracy": 0.8301,
+      "baseline_auc": 0.9156687259674072,
+      "attack_accuracy": 0.1993,
+      "attack_auc": 0.11035346239805222,
+      "attack_auc_delta": -0.805315263569355
+    },
+    {
+      "model": "gnn",
+      "optimizer": "momentum-sgd",
+      "baseline_accuracy": 0.8489000201225281,
+      "baseline_auc": 0.928361177444458,
+      "attack_accuracy": 0.1665000021457672,
+      "attack_auc": 0.08604921400547028,
+      "attack_auc_delta": -0.8423119634389877
+    },
+    {
+      "model": "gnn",
+      "optimizer": "sgd",
+      "baseline_accuracy": 0.7519000172615051,
+      "baseline_auc": 0.8302682638168335,
+      "attack_accuracy": 0.4108000099658966,
+      "attack_auc": 0.3846336901187897,
+      "attack_auc_delta": -0.4456345736980438
+    },
+    {
+      "model": "transformer-encoder-decoder",
+      "optimizer": "adam",
+      "baseline_accuracy": 0.8938999772071838,
+      "baseline_auc": 0.9609588980674744,
+      "attack_accuracy": 0.1712000072002411,
+      "attack_auc": 0.07408556342124939,
+      "attack_auc_delta": -0.886873334646225
+    },
+    {
+      "model": "rnn",
+      "optimizer": "momentum-sgd",
+      "baseline_accuracy": 0.5044000148773193,
+      "baseline_auc": 0.5051674246788025,
+      "attack_accuracy": 0.4878000020980835,
+      "attack_auc": 0.4865729808807373,
+      "attack_auc_delta": -0.018594443798065186,
+      "note": "The vanilla RNN did not learn the random-order task under the shared LSTM-tuned hyperparameters; it is not evidence for or against the order-only mechanism."
+    }
+  ]
+}
