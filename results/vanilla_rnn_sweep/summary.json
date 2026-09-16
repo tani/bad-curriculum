@@ -1,0 +1,42 @@
+[
+  {
+    "model": "rnn",
+    "optimizer": "sgd",
+    "diverged": false,
+    "baseline_accuracy": 0.5619999766349792,
+    "baseline_auc": 0.5770342350006104,
+    "attack_accuracy": 0.5080000162124634,
+    "attack_auc": 0.503212034702301,
+    "elapsed_sec": 29.9
+  },
+  {
+    "model": "rnn",
+    "optimizer": "momentum-sgd",
+    "diverged": false,
+    "baseline_accuracy": 0.5019999742507935,
+    "baseline_auc": 0.5142266154289246,
+    "attack_accuracy": 0.49549999833106995,
+    "attack_auc": 0.5029500126838684,
+    "elapsed_sec": 30.2
+  },
+  {
+    "model": "rnn",
+    "optimizer": "adam",
+    "diverged": false,
+    "baseline_accuracy": 0.6520000100135803,
+    "baseline_auc": 0.6995767951011658,
+    "attack_accuracy": 0.531499981880188,
+    "attack_auc": 0.5677856206893921,
+    "elapsed_sec": 26.7
+  },
+  {
+    "model": "rnn",
+    "optimizer": "adamw",
+    "diverged": false,
+    "baseline_accuracy": 0.5870000123977661,
+    "baseline_auc": 0.5994908809661865,
+    "attack_accuracy": 0.4494999945163727,
+    "attack_auc": 0.40919071435928345,
+    "elapsed_sec": 28.5
+  }
+]

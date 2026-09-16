@@ -1,0 +1,11 @@
+model,optimizer,status,random_auc,anchor_tail_auc,delta_auc,run_series
+lstm,momentum-sgd,complete,0.9156687260,0.1103534624,-0.8053152636,legacy-full-scale-followup
+gnn,momentum-sgd,complete,0.9283611774,0.0860492140,-0.8423119634,legacy-full-scale-followup
+gnn,sgd,complete,0.8302682638,0.3846336901,-0.4456345737,legacy-full-scale-followup
+transformer-encoder-decoder,adam,complete,0.9609588981,0.0740855634,-0.8868733346,legacy-full-scale-followup
+rnn,momentum-sgd,complete,0.5051674247,0.4865729809,-0.0185944438,legacy-full-scale-followup
+linear-fixed-features,sgd,complete,0.7944732904,0.7950573564,+0.0005840659,added-full-scale-followup
+linear-fixed-features,momentum-sgd,complete,0.8306807280,0.8413519859,+0.0106712580,added-full-scale-followup
+mean-pool-mlp,momentum-sgd,complete,0.9189811945,0.0835631713,-0.8354180232,added-full-scale-followup
+gru,adam,complete,0.9686516523,0.0833049491,-0.8853467032,added-full-scale-followup
+tcn,adamw,complete,0.9435327053,0.0930522010,-0.8504805043,added-full-scale-followup

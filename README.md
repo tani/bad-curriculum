@@ -76,11 +76,70 @@ than merely losing accuracy.
 100,000-review event multiset, preserve every source label, and contain zero
 repeated reviews.
 
-### Full-scale result summary
+## Experiment matrices
+
+ΔAUC is the Anchor → Counterexample Tail AUC minus the same-pool random-order
+AUC. `results/reduced_matrix.csv` and `results/full_scale_matrix.csv` are the
+machine-readable canonical tables.
+
+### Reduced sweep — complete 44/44 matrix
+
+The reduced protocol uses selector 5,000/class, candidate reservoir
+18,000/class, Anchor 9,000, Tail 500/class, and test 2,000. The original
+six-model sweep predates the vanilla-RNN/LSTM split: its historical `rnn`
+artifact is correctly labelled LSTM below.
+
+| Model | Optimizer | Status | Random AUC | Anchor → Tail AUC | ΔAUC |
+|---|---|---|---:|---:|---:|
+| CNN | SGD | complete | 0.8519 | 0.6201 | -0.2317 |
+| CNN | Momentum SGD | diverged | — | — | — |
+| CNN | Adam | complete | 0.8965 | 0.8416 | -0.0549 |
+| CNN | AdamW | complete | 0.8959 | 0.8367 | -0.0592 |
+| LSTM (legacy sweep) | SGD | complete | 0.5896 | 0.5863 | -0.0033 |
+| LSTM (legacy sweep) | Momentum SGD | complete | 0.6726 | 0.3608 | -0.3118 |
+| LSTM (legacy sweep) | Adam | complete | 0.7861 | 0.6673 | -0.1188 |
+| LSTM (legacy sweep) | AdamW | complete | 0.8055 | 0.5917 | -0.2138 |
+| GNN | SGD | complete | 0.6648 | 0.6676 | +0.0028 |
+| GNN | Momentum SGD | complete | 0.8041 | 0.2415 | -0.5626 |
+| GNN | Adam | complete | 0.8829 | 0.8633 | -0.0196 |
+| GNN | AdamW | complete | 0.8830 | 0.8634 | -0.0196 |
+| Transformer Encoder | SGD | complete | 0.6421 | 0.3892 | -0.2529 |
+| Transformer Encoder | Momentum SGD | complete | 0.6944 | 0.3126 | -0.3818 |
+| Transformer Encoder | Adam | complete | 0.8866 | 0.6601 | -0.2264 |
+| Transformer Encoder | AdamW | complete | 0.8860 | 0.6689 | -0.2171 |
+| Transformer Decoder | SGD | complete | 0.5752 | 0.4646 | -0.1107 |
+| Transformer Decoder | Momentum SGD | complete | 0.6884 | 0.4392 | -0.2492 |
+| Transformer Decoder | Adam | complete | 0.8504 | 0.5941 | -0.2563 |
+| Transformer Decoder | AdamW | complete | 0.8506 | 0.5886 | -0.2620 |
+| Transformer Encoder–Decoder | SGD | complete | 0.6434 | 0.4082 | -0.2352 |
+| Transformer Encoder–Decoder | Momentum SGD | complete | 0.4396 | 0.5772 | +0.1376 |
+| Transformer Encoder–Decoder | Adam | complete | 0.8859 | 0.2758 | -0.6102 |
+| Transformer Encoder–Decoder | AdamW | complete | 0.8859 | 0.3162 | -0.5698 |
+| Fixed token-count linear | SGD | complete | 0.7906 | 0.7913 | +0.0007 |
+| Fixed token-count linear | Momentum SGD | complete | 0.8031 | 0.7964 | -0.0066 |
+| Fixed token-count linear | Adam | complete | 0.8897 | 0.8867 | -0.0030 |
+| Fixed token-count linear | AdamW | complete | 0.8897 | 0.8867 | -0.0029 |
+| Mean-pool MLP | SGD | complete | 0.7211 | 0.7259 | +0.0047 |
+| Mean-pool MLP | Momentum SGD | complete | 0.8048 | 0.1955 | -0.6093 |
+| Mean-pool MLP | Adam | complete | 0.8825 | 0.8706 | -0.0119 |
+| Mean-pool MLP | AdamW | complete | 0.8826 | 0.8708 | -0.0117 |
+| GRU | SGD | complete | 0.5857 | 0.5471 | -0.0386 |
+| GRU | Momentum SGD | complete | 0.6851 | 0.2767 | -0.4084 |
+| GRU | Adam | complete | 0.8429 | 0.3142 | -0.5287 |
+| GRU | AdamW | complete | 0.8417 | 0.4294 | -0.4123 |
+| TCN | SGD | complete | 0.5397 | 0.5375 | -0.0022 |
+| TCN | Momentum SGD | complete | 0.5130 | 0.4843 | -0.0288 |
+| TCN | Adam | complete | 0.6414 | 0.5610 | -0.0804 |
+| TCN | AdamW | complete | 0.6412 | 0.5341 | -0.1071 |
+| Vanilla RNN | SGD | complete | 0.5770 | 0.5032 | -0.0738 |
+| Vanilla RNN | Momentum SGD | complete | 0.5142 | 0.5030 | -0.0113 |
+| Vanilla RNN | Adam | complete | 0.6996 | 0.5678 | -0.1318 |
+| Vanilla RNN | AdamW | complete | 0.5995 | 0.4092 | -0.1903 |
+
+### Full-scale follow-up — 10 selected matrix cells
 
 All rows below use the pinned revision, CUDA, seed `20260911`, a 100,000-review
-target pool, and the same disjoint-selector protocol. ΔAUC is the
-Anchor → Counterexample Tail AUC minus the same-pool random-order AUC.
+target pool, and the same disjoint-selector protocol.
 
 | Model | Optimizer | Random AUC | Anchor → Tail AUC | ΔAUC |
 |---|---|---:|---:|---:|
@@ -94,13 +153,6 @@ Anchor → Counterexample Tail AUC minus the same-pool random-order AUC.
 | GNN | SGD | 0.8303 | 0.3846 | -0.4456 |
 | GNN | Momentum SGD | 0.9284 | 0.0860 | -0.8423 |
 | Transformer Encoder–Decoder | Adam | 0.9610 | 0.0741 | -0.8869 |
-
-The fixed-feature controls show no harmful order effect, while every
-full-scale learned-representation model listed with a nontrivial random-order
-baseline anti-ranks after the Anchor → Tail schedule. The complete reduced
-architecture × optimizer matrices are tracked in
-`results/model_optimizer_sweep/summary.json` and
-`results/additional_architecture_sweep/summary.json`.
 
 ## Outputs
 
