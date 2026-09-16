@@ -11,7 +11,38 @@ permissions:
   contents: read
 
 jobs:
+  runtime:
+    if: contains(github.event.head_commit.message, '[runtime]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container:
+      image: makarius/isabelle:Isabelle2025-2_X11_Latex
+    steps:
+      - name: Export pinned proof-checking runtime
+        shell: bash
+        run: |
+          set -eu
+          mkdir -p proof-runtime
+          HOME_DIR=$(/home/isabelle/Isabelle/bin/isabelle getenv -b ISABELLE_HOME)
+          /home/isabelle/Isabelle/bin/isabelle version
+          printf '%s\n' "$HOME_DIR"
+          tar -czhf proof-runtime/isabelle-base.tar.gz --exclude=./contrib --exclude=./doc --exclude='*.ttf' --exclude='*.otf' --exclude='*.woff*' -C "$HOME_DIR" .
+          tar -czhf proof-runtime/isabelle-contrib.tar.gz --exclude='*.ttf' --exclude='*.otf' --exclude='*.woff*' -C "$HOME_DIR" contrib
+          du -h proof-runtime/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: proof-runtime-base
+          path: proof-runtime/isabelle-base.tar.gz
+          compression-level: 0
+          retention-days: 1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: proof-runtime-contrib
+          path: proof-runtime/isabelle-contrib.tar.gz
+          compression-level: 0
+          retention-days: 1
   verify:
+    if: "!contains(github.event.head_commit.message, '[runtime]')"
     runs-on: ubuntu-latest
     timeout-minutes: 45
     container:
