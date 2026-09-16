@@ -1,0 +1,59 @@
+name: Verify Adam upper-layer proofs
+
+on:
+  push:
+    branches: [proof/adam-adamw-upper-layers-20260917]
+    paths:
+      - formalization/**
+      - .github/workflows/adam-proof-check.yml
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    container:
+      image: makarius/isabelle:Isabelle2025-2_X11_Latex
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify the complete session
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p proof-logs
+          /home/isabelle/Isabelle/bin/isabelle version | tee proof-logs/version.txt
+          /home/isabelle/Isabelle/bin/isabelle build -v -o threads=2 -o parallel_proofs=0 -D formalization Bad_Curriculum 2>&1 | tee proof-logs/build.log
+      - name: Export source and verification logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: proof-source-and-logs
+          path: |
+            formalization
+            proof-logs
+          retention-days: 7
+      - name: Export a local proof-checking runtime
+        if: success()
+        shell: bash
+        run: |
+          set -eu
+          if test ! -f formalization/Adam_Upper_Layers.thy; then
+            mkdir -p proof-runtime
+            HOME_DIR=$(/home/isabelle/Isabelle/bin/isabelle getenv -b ISABELLE_HOME)
+            USER_DIR=$(/home/isabelle/Isabelle/bin/isabelle getenv -b ISABELLE_HOME_USER)
+            printf '%s\n%s\n' "$HOME_DIR" "$USER_DIR" | tee proof-runtime/locations.txt
+            tar -czhf proof-runtime/isabelle-runtime.tar.gz -C "$HOME_DIR" .
+            tar -czhf proof-runtime/isabelle-user.tar.gz -C "$USER_DIR" .
+            du -h proof-runtime/*
+          fi
+      - name: Upload local proof-checking runtime
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: proof-checking-runtime
+          path: proof-runtime
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: ignore
