@@ -18,6 +18,12 @@ jobs:
       image: makarius/isabelle:Isabelle2025-2_X11_Latex
     steps:
       - uses: actions/checkout@v4
+      - name: Export exact source input
+        uses: actions/upload-artifact@v4
+        with:
+          name: proof-source-input
+          path: formalization
+          retention-days: 7
       - name: Verify the complete session
         shell: bash
         run: |
@@ -34,26 +40,3 @@ jobs:
             formalization
             proof-logs
           retention-days: 7
-      - name: Export a local proof-checking runtime
-        if: success()
-        shell: bash
-        run: |
-          set -eu
-          if test ! -f formalization/Adam_Upper_Layers.thy; then
-            mkdir -p proof-runtime
-            HOME_DIR=$(/home/isabelle/Isabelle/bin/isabelle getenv -b ISABELLE_HOME)
-            USER_DIR=$(/home/isabelle/Isabelle/bin/isabelle getenv -b ISABELLE_HOME_USER)
-            printf '%s\n%s\n' "$HOME_DIR" "$USER_DIR" | tee proof-runtime/locations.txt
-            tar -czhf proof-runtime/isabelle-runtime.tar.gz -C "$HOME_DIR" .
-            tar -czhf proof-runtime/isabelle-user.tar.gz -C "$USER_DIR" .
-            du -h proof-runtime/*
-          fi
-      - name: Upload local proof-checking runtime
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: proof-checking-runtime
-          path: proof-runtime
-          compression-level: 0
-          retention-days: 1
-          if-no-files-found: ignore
