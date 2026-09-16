@@ -76,6 +76,32 @@ than merely losing accuracy.
 100,000-review event multiset, preserve every source label, and contain zero
 repeated reviews.
 
+### Full-scale result summary
+
+All rows below use the pinned revision, CUDA, seed `20260911`, a 100,000-review
+target pool, and the same disjoint-selector protocol. ΔAUC is the
+Anchor → Counterexample Tail AUC minus the same-pool random-order AUC.
+
+| Model | Optimizer | Random AUC | Anchor → Tail AUC | ΔAUC |
+|---|---|---:|---:|---:|
+| Fixed token-count linear | SGD | 0.7945 | 0.7951 | +0.0006 |
+| Fixed token-count linear | Momentum SGD | 0.8307 | 0.8414 | +0.0107 |
+| Mean-pool MLP | Momentum SGD | 0.9190 | 0.0836 | -0.8354 |
+| Vanilla RNN | Momentum SGD | 0.5052 | 0.4866 | -0.0186 |
+| GRU | Adam | 0.9687 | 0.0833 | -0.8853 |
+| LSTM | Momentum SGD | 0.9157 | 0.1104 | -0.8053 |
+| TCN | AdamW | 0.9435 | 0.0931 | -0.8505 |
+| GNN | SGD | 0.8303 | 0.3846 | -0.4456 |
+| GNN | Momentum SGD | 0.9284 | 0.0860 | -0.8423 |
+| Transformer Encoder–Decoder | Adam | 0.9610 | 0.0741 | -0.8869 |
+
+The fixed-feature controls show no harmful order effect, while every
+full-scale learned-representation model listed with a nontrivial random-order
+baseline anti-ranks after the Anchor → Tail schedule. The complete reduced
+architecture × optimizer matrices are tracked in
+`results/model_optimizer_sweep/summary.json` and
+`results/additional_architecture_sweep/summary.json`.
+
 ## Outputs
 
 - `run.json` — command, dataset revision, seed, device, training setup,
