@@ -1,5 +1,5 @@
 \documentclass[final]{beamer}
-\usepackage[size=a0,orientation=landscape,scale=1.12]{beamerposter}
+\usepackage[size=a0,orientation=portrait,scale=1.08]{beamerposter}
 \usepackage{luatexja-fontspec}
 \usepackage{fontspec}
 \setsansfont{Nimbus Sans}
@@ -8,12 +8,12 @@
 \setmainjfont{Noto Sans CJK JP}
 \usefonttheme{professionalfonts}
 
-\usepackage{amsmath,amssymb,booktabs,array}
+\usepackage{amsmath,amssymb,booktabs,array,graphicx}
 \usepackage{tikz}
 \usepackage{pgfplots}
 \usepackage{qrcode}
 \usepackage{fontawesome5}
-\usetikzlibrary{arrows.meta,positioning,calc,fit,shapes.geometric,backgrounds,matrix}
+\usetikzlibrary{arrows.meta,positioning,calc,fit,shapes.geometric,matrix}
 \pgfplotsset{compat=1.18}
 
 \definecolor{Ink}{HTML}{102A37}
@@ -36,139 +36,151 @@
 \setbeamercolor{normal text}{fg=Ink,bg=Paper}
 \setbeamercolor{block title}{fg=White,bg=Navy}
 \setbeamercolor{block body}{fg=Ink,bg=White}
-\setbeamerfont{normal text}{size=\fontsize{21}{26}}
-\setbeamerfont{block title}{series=\bfseries,size=\fontsize{28}{33}}
-\setbeamerfont{block body}{size=\fontsize{20}{25}}
+\setbeamerfont{normal text}{size=\fontsize{24}{30}}
+\setbeamerfont{block title}{series=\bfseries,size=\fontsize{31}{37}}
+\setbeamerfont{block body}{size=\fontsize{23}{29}}
 \setbeamertemplate{navigation symbols}{}
 \setbeamersize{text margin left=0pt,text margin right=0pt}
-\setbeamertemplate{itemize item}{\color{Coral}\raise0.15ex\hbox{\scriptsize$\blacktriangleright$}}
-\setbeamertemplate{itemize subitem}{\color{Teal}\raise0.15ex\hbox{\tiny$\blacktriangleright$}}
-\setlength{\leftmargini}{1.25em}
-\setlength{\leftmarginii}{1.1em}
+\setbeamertemplate{itemize item}{\color{Coral}\raise0.16ex\hbox{\scriptsize$\blacktriangleright$}}
+\setlength{\leftmargini}{1.2em}
 
 \setbeamertemplate{block begin}{%
-  \vskip0.55cm
-  \begin{beamercolorbox}[wd=\linewidth,sep=0.48cm,leftskip=0.25cm,rounded=true]{block title}%
+  \vskip0.58cm
+  \begin{beamercolorbox}[wd=\linewidth,sep=0.55cm,leftskip=0.25cm,rounded=true]{block title}%
     \usebeamerfont{block title}\insertblocktitle
   \end{beamercolorbox}%
-  \vskip-0.10cm
-  \begin{beamercolorbox}[wd=\linewidth,sep=0.62cm,rounded=true]{block body}%
+  \vskip-0.11cm
+  \begin{beamercolorbox}[wd=\linewidth,sep=0.72cm,rounded=true]{block body}%
     \usebeamerfont{block body}%
 }
-\setbeamertemplate{block end}{%
-  \end{beamercolorbox}
-}
+\setbeamertemplate{block end}{\end{beamercolorbox}}
 
-\newcommand{\posteremph}[1]{\textcolor{CoralDark}{\textbf{#1}}}
-\newcommand{\postergood}[1]{\textcolor{TealDark}{\textbf{#1}}}
-\newcommand{\metriccard}[4]{%
-\begin{tikzpicture}[baseline=(current bounding box.center)]
-  \node[rounded corners=0.45cm,fill=#2,minimum width=#1,minimum height=4.4cm,
-    text width=\dimexpr#1-0.9cm\relax,text=White,align=center,inner sep=0.45cm] {
-    {\fontsize{21}{24}\selectfont\bfseries #3}\\[-0.08cm]
-    {\fontsize{38}{42}\selectfont\bfseries #4}};
-\end{tikzpicture}%
-}
-
-\newcommand{\colpad}{0.72cm}
-\newcommand{\colwidth}{0.319\paperwidth}
-\newcommand{\innerwidth}{\dimexpr\colwidth-2\colpad\relax}
+\newcommand{\bcpemph}[1]{\textcolor{CoralDark}{\textbf{#1}}}
+\newcommand{\bcpgood}[1]{\textcolor{TealDark}{\textbf{#1}}}
+\newcommand{\leftcolwidth}{38.7cm}
+\newcommand{\rightcolwidth}{38.7cm}
 
 \begin{document}
 \begin{frame}[t]
 
-% Full-bleed background and header/footer bands.
+% Full-bleed page, header, and footer.
 \begin{tikzpicture}[remember picture,overlay]
   \fill[Paper] (current page.south west) rectangle (current page.north east);
-  \fill[Ink] (current page.north west) rectangle ([yshift=-10.1cm]current page.north east);
-  \fill[Teal] ([yshift=-9.65cm]current page.north west) rectangle ([yshift=-10.1cm]current page.north east);
-  \fill[Ink] (current page.south west) rectangle ([yshift=3.25cm]current page.south east);
-  \fill[Gold] (current page.south west) rectangle ([xshift=0.9cm]current page.north west |- current page.south west);
-  \fill[Coral] ([xshift=0.9cm]current page.south west) rectangle ([xshift=1.8cm]current page.north west |- current page.south west);
+  \fill[Ink] (current page.north west) rectangle ([yshift=-14.5cm]current page.north east);
+  \fill[Teal] ([yshift=-14.0cm]current page.north west) rectangle ([yshift=-14.5cm]current page.north east);
+  \fill[Ink] (current page.south west) rectangle ([yshift=4.7cm]current page.south east);
+  \fill[Gold] (current page.south west) rectangle ([xshift=0.8cm]current page.north west |- current page.south west);
+  \fill[Coral] ([xshift=0.8cm]current page.south west) rectangle ([xshift=1.6cm]current page.north west |- current page.south west);
 \end{tikzpicture}
 
-% Header: edge-to-edge, no outer white margin.
+% Header.
 \begin{tikzpicture}[remember picture,overlay]
-  \node[anchor=north west,text=White,align=left,inner sep=0pt]
-    at ([xshift=2.7cm,yshift=-1.25cm]current page.north west) {
-      {\fontsize{62}{68}\selectfont\bfseries Bad Curriculum}\\[0.18cm]
-      {\fontsize{31}{37}\selectfont\bfseries 同じデータ、同じラベル、違う順序だけで予測を反転させる}
-    };
-  \node[anchor=north east,text=White,align=right,inner sep=0pt]
-    at ([xshift=-2.1cm,yshift=-1.45cm]current page.north east) {
-      {\fontsize{24}{29}\selectfont Bad Curriculum contributors}\\[0.18cm]
-      {\fontsize{20}{24}\selectfont PyTorch実験 \,$\times$\, Isabelle/HOL形式証明}
+  \node[anchor=north west,text=White,align=left,inner sep=0pt,text width=73cm]
+    at ([xshift=2.4cm,yshift=-1.45cm]current page.north west) {
+      {\fontsize{72}{78}\selectfont\bfseries Bad Curriculum}\\[0.28cm]
+      {\fontsize{36}{44}\selectfont\bfseries
+       同じデータ、同じラベル。違う順序だけで予測を反転させる}
     };
   \node[anchor=south west,fill=Coral,rounded corners=0.38cm,text=White,
-    inner xsep=0.85cm,inner ysep=0.43cm]
-    at ([xshift=2.7cm,yshift=-9.20cm]current page.north west)
-    {\fontsize{25}{30}\selectfont\bfseries AUC: 0.9157 $\longrightarrow$ 0.1104};
-  \node[anchor=south west,text=White,inner sep=0pt]
-    at ([xshift=20.8cm,yshift=-8.92cm]current page.north west)
-    {\fontsize{21}{26}\selectfont 100,000件の同一レビュー集合・ラベル改変なし・重複なし};
+    inner xsep=0.9cm,inner ysep=0.46cm]
+    at ([xshift=2.4cm,yshift=-13.1cm]current page.north west)
+    {\fontsize{28}{34}\selectfont\bfseries LSTM AUC：0.9157 $\longrightarrow$ 0.1104};
+  \node[anchor=south east,text=White,align=right,inner sep=0pt,text width=37cm]
+    at ([xshift=-2.2cm,yshift=-13.05cm]current page.north east) {
+      {\fontsize{23}{28}\selectfont\bfseries 100,000件・ラベル改変なし・重複なし}\\[-0.05cm]
+      {\fontsize{19}{24}\selectfont PyTorch実験 $\times$ Isabelle/HOL形式証明}
+    };
 \end{tikzpicture}
 
-\vspace*{10.35cm}
+\vspace*{15.05cm}
 
-% Three full-width columns. The page background reaches every edge; only internal gutters remain.
-\begin{columns}[t,totalwidth=\paperwidth]
-
-% -----------------------------------------------------------------------------
-\begin{column}{\colwidth}
-\hspace*{\colpad}\begin{minipage}[t]{\innerwidth}
+% Robust portrait grid: explicit physical widths, no nested Beamer columns.
+\noindent\hbox to \linewidth{%
+\hspace*{2.1cm}%
+\begin{minipage}[t]{\leftcolwidth}
 
 \begin{block}{1｜問い：順序だけで学習結果は壊せるか？}
 2条件で固定するもの：
 \begin{itemize}
   \item 同じ\textbf{100,000件}のYelpレビューとsource label
-  \item 同じ語彙、モデル初期値、テスト集合、optimizer
-  \item 違いは訓練イベントの\posteremph{permutationだけ}
+  \item 同じ語彙、初期値、モデル、optimizer、テスト集合
+  \item 違いは訓練イベントの\bcpemph{permutationだけ}
 \end{itemize}
-\vspace{0.15cm}
-\[
-D=A\cup B,\qquad
-\pi_{\rm random}=\operatorname{Shuffle}(D),\qquad
-\pi_{\rm attack}=\operatorname{Shuffle}(A)\Vert\operatorname{Shuffle}(B).
-\]
+\vspace{0.2cm}
+\begin{beamercolorbox}[wd=\linewidth,sep=0.45cm,rounded=true,center]{alerted text}
+\color{Ink}\fontsize{23}{29}\selectfont
+$D=A\cup B$ を固定し、$\pi_{\rm random}$ と $\pi_{\rm attack}$ だけを比較する。
+\end{beamercolorbox}
 \end{block}
 
 \begin{block}{2｜データ構成：selectorとtargetを分離}
 \centering
 \begin{tikzpicture}[
-  node distance=1.05cm and 1.05cm,
-  box/.style={rounded corners=0.32cm,minimum width=9.2cm,minimum height=3.0cm,
-              align=center,text width=8.3cm,very thick},
-  flow/.style={-{Latex[length=0.45cm]},very thick,color=Muted},
-  label/.style={font=\fontsize{17}{20}\selectfont,text=Muted,align=center}
+  box/.style={rounded corners=0.35cm,very thick,align=center,minimum height=3.2cm},
+  arr/.style={-{Latex[length=0.5cm]},line width=0.12cm,Muted}
 ]
-  \node[box,fill=SoftBlue,draw=Blue] (s) {\textbf{Selector学習集合 $S$}\\100,000件・targetとdisjoint};
-  \node[box,fill=SoftGold,draw=Gold,right=of s] (r) {\textbf{候補集合 $R$}\\360,000件・selectorがscore};
-  \node[box,fill=SoftTeal,draw=Teal,below=1.45cm of r,xshift=-5.25cm] (a) {\textbf{Anchor $A$}\\90,000件・balanced};
-  \node[box,fill=SoftCoral,draw=Coral,below=1.45cm of r,xshift=5.25cm] (b) {\textbf{Counterexample Tail $B$}\\10,000件・各class 5,000};
-  \draw[flow] (s) -- node[above,label]{学習したselector} (r);
-  \draw[flow] (r.south) -- ++(0,-0.6) -| (a.north);
-  \draw[flow] (r.south) -- ++(0,-0.6) -| (b.north);
-  \node[label,below=0.35cm of a] {source labelをそのまま使用};
-  \node[label,below=0.35cm of b] {高信頼のselector誤分類例};
+  \node[box,fill=SoftBlue,draw=Blue,text width=15.0cm] (sel)
+    {\textbf{Selector学習集合}\\100,000件・targetとdisjoint};
+  \node[box,fill=SoftGold,draw=Gold,text width=15.0cm,right=1.3cm of sel] (res)
+    {\textbf{候補集合 $R$}\\360,000件・selectorがscore};
+  \node[box,fill=SoftTeal,draw=Teal,text width=15.0cm,below=1.25cm of sel] (anchor)
+    {\textbf{Anchor $A$}\\90,000件・balanced};
+  \node[box,fill=SoftCoral,draw=Coral,text width=15.0cm,right=1.3cm of anchor] (tail)
+    {\textbf{Counterexample Tail $B$}\\10,000件・各class 5,000};
+  \draw[arr] (sel) -- (tail);
+  \draw[arr] (res) -- (anchor);
+  \draw[arr] (res) -- (tail);
+  \node[font=\fontsize{19}{23}\selectfont,text=Muted,below=0.35cm of anchor]
+    {source labelをそのまま使用};
+  \node[font=\fontsize{19}{23}\selectfont,text=Muted,below=0.35cm of tail]
+    {高信頼のselector誤分類例};
 \end{tikzpicture}
 
-\vspace{0.35cm}
+\vspace{0.55cm}
 \begin{tikzpicture}[
-  sched/.style={rounded corners=0.35cm,minimum height=2.7cm,align=center,very thick},
-  arr/.style={-{Latex[length=0.42cm]},very thick}
+  sched/.style={rounded corners=0.35cm,very thick,align=center,minimum height=3.4cm,text width=15.0cm}
 ]
-  \node[sched,fill=SoftBlue,draw=Blue,minimum width=12.5cm] (rand)
+  \node[sched,fill=SoftBlue,draw=Blue] (random)
     {\textbf{Random control}\\$\operatorname{Shuffle}(A\cup B)$};
-  \node[sched,fill=SoftCoral,draw=Coral,minimum width=12.5cm,right=1.0cm of rand] (attack)
+  \node[sched,fill=SoftCoral,draw=Coral,right=1.3cm of random] (attack)
     {\textbf{Attack schedule}\\$\operatorname{Shuffle}(A)\Vert\operatorname{Shuffle}(B)$};
-  \node[above=0.35cm of $(rand.north)!0.5!(attack.north)$,font=\bfseries] {同じmultisetから2つの順序};
 \end{tikzpicture}
 \end{block}
 
-\begin{block}{3｜監査可能な「順序だけ」の比較}
-\begin{tikzpicture}[node distance=0.7cm,
+\begin{block}{3｜記録済みLSTM結果：ランキングが反転}
+\centering
+\begin{tikzpicture}[
+  card/.style={rounded corners=0.45cm,minimum width=16.0cm,minimum height=5.1cm,
+               text=White,align=center,inner sep=0.5cm}
+]
+  \node[card,fill=Teal] (r)
+    {{\fontsize{22}{27}\selectfont\bfseries Random order}\\[-0.05cm]
+     {\fontsize{39}{44}\selectfont\bfseries AUC 0.9157}};
+  \node[card,fill=Coral,right=1.2cm of r] (a)
+    {{\fontsize{22}{27}\selectfont\bfseries Anchor $\rightarrow$ Tail}\\[-0.05cm]
+     {\fontsize{39}{44}\selectfont\bfseries AUC 0.1104}};
+\end{tikzpicture}
+
+\vspace{0.5cm}
+\begin{tikzpicture}[
+  acc/.style={rounded corners=0.3cm,minimum width=16.0cm,minimum height=3.6cm,align=center,very thick}
+]
+  \node[acc,fill=SoftBlue,draw=Blue] (ra) {Accuracy\\{\fontsize{30}{35}\selectfont\bfseries 83.01\%}};
+  \node[acc,fill=SoftCoral,draw=Coral,right=1.2cm of ra] (aa) {Accuracy\\{\fontsize{30}{35}\selectfont\bfseries 19.93\%}};
+  \draw[-{Latex[length=0.5cm]},line width=0.13cm,Coral] (ra) -- (aa);
+\end{tikzpicture}
+
+\vspace{0.35cm}
+{\color{CoralDark}\bfseries AUC $<0.5$：精度低下ではなく、positive classを系統的に逆順位付け。}
+\end{block}
+
+\begin{block}{4｜監査可能な「順序だけ」の比較}
+\centering
+\begin{tikzpicture}[
   check/.style={rounded corners=0.28cm,fill=SoftTeal,draw=Teal,very thick,
-                minimum height=1.55cm,text width=13.1cm,align=left,inner xsep=0.5cm}]
+                text width=33.6cm,minimum height=2.5cm,align=left,inner sep=0.38cm},
+  node distance=0.55cm
+]
   \node[check] (c1) {\faCheckCircle\quad common-event SHA-256で同一multisetを確認};
   \node[check,below=of c1] (c2) {\faCheckCircle\quad source labelを保持：label flipなし};
   \node[check,below=of c2] (c3) {\faCheckCircle\quad selector集合とtarget集合はdisjoint};
@@ -176,61 +188,58 @@ D=A\cup B,\qquad
 \end{tikzpicture}
 \end{block}
 
-\end{minipage}
-\end{column}
-
-% -----------------------------------------------------------------------------
-\begin{column}{\colwidth}
-\hspace*{\colpad}\begin{minipage}[t]{\innerwidth}
-
-\begin{block}{4｜記録済みLSTM結果：ランキングが反転}
+\begin{block}{5｜何が効いている？}
 \centering
-\metriccard{12.8cm}{Teal}{Random order}{AUC 0.9157}
-\hspace{0.5cm}
-\metriccard{12.8cm}{Coral}{Anchor $\rightarrow$ Tail}{AUC 0.1104}
-
-\vspace{0.45cm}
-\begin{tikzpicture}
-  \node[rounded corners=0.34cm,fill=SoftBlue,draw=Blue,very thick,
-    minimum width=12.8cm,minimum height=3.1cm,align=center]
-    {\textbf{Accuracy}\\{\fontsize{28}{32}\selectfont 83.01\%}};
-  \node[rounded corners=0.34cm,fill=SoftCoral,draw=Coral,very thick,
-    minimum width=12.8cm,minimum height=3.1cm,align=center,xshift=13.35cm]
-    {\textbf{Accuracy}\\{\fontsize{28}{32}\selectfont 19.93\%}};
-  \draw[-{Latex[length=0.5cm]},line width=0.14cm,Coral]
-    (6.4cm,0) -- (6.95cm,0);
+\begin{tikzpicture}[
+  state/.style={circle,very thick,minimum size=6.5cm,align=center},
+  flow/.style={-{Latex[length=0.55cm]},line width=0.14cm,Coral}
+]
+  \node[state,fill=SoftBlue,draw=Blue] (anchor) {\textbf{Anchor}\\表現を形成};
+  \node[state,fill=SoftCoral,draw=Coral,right=3.0cm of anchor] (tail) {\textbf{Tail}\\強い修正勾配};
+  \draw[flow] (anchor) -- (tail);
 \end{tikzpicture}
 
-\vspace{0.25cm}
-\begin{beamercolorbox}[wd=\linewidth,sep=0.42cm,rounded=true,center]{alerted text}
-\color{CoralDark}\fontsize{23}{28}\selectfont\bfseries
-AUC $<0.5$：単なる精度低下ではなく、positive classを系統的に逆順位付け
-\end{beamercolorbox}
+\vspace{0.45cm}
+\resizebox{0.82\linewidth}{!}{$\displaystyle
+\Phi_B^m\!\left(\Phi_A^n(\theta_0)\right)
+\;\neq\;
+\Phi_A^n\!\left(\Phi_B^m(\theta_0)\right)$}
+
+\vspace{0.45cm}
+\begin{minipage}{0.92\linewidth}
+\centering
+非線形な更新写像は一般に可換でない。Tailはlabel poisonではない。\\
+\bcpemph{source labelを使った大きな修正update}が、最後にモデルを上書きする。
+\end{minipage}
 \end{block}
 
-\begin{block}{5｜full-scale 10セル：非線形モデルで大幅低下}
+\end{minipage}%
+\hfill
+\begin{minipage}[t]{\rightcolwidth}
+
+\begin{block}{6｜実験結果：full-scale 10セル}
 \centering
 \begin{tikzpicture}
 \begin{axis}[
-  width=0.96\linewidth,
-  height=20.2cm,
+  width=0.93\linewidth,
+  height=27.0cm,
   xmin=0.45,xmax=1.0,
   ymin=0.02,ymax=0.90,
   xlabel={Random order AUC},
   ylabel={Anchor $\rightarrow$ Tail AUC},
   axis line style={very thick,Ink},
   tick style={very thick,Ink},
-  tick label style={font=\fontsize{16}{19}\selectfont},
-  label style={font=\fontsize{19}{23}\selectfont\bfseries},
+  tick label style={font=\fontsize{18}{22}\selectfont},
+  label style={font=\fontsize{22}{27}\selectfont\bfseries},
   grid=major,
   major grid style={draw=Muted!25,line width=0.8pt},
   legend style={at={(0.03,0.97)},anchor=north west,draw=none,fill=White,
-                font=\fontsize{16}{19}\selectfont},
-  clip=false
+                font=\fontsize{17}{21}\selectfont},
+  clip=true
 ]
   \addplot[Ink!45,dashed,line width=1.8pt,domain=0.45:0.90] {x};
   \addlegendentry{変化なし $y=x$}
-  \addplot[only marks,mark=*,mark size=7pt,Coral,draw=CoralDark,very thick]
+  \addplot[only marks,mark=*,mark size=8pt,Coral,draw=CoralDark,very thick]
     coordinates {
       (0.9156687260,0.1103534624)
       (0.9283611774,0.0860492140)
@@ -242,122 +251,80 @@ AUC $<0.5$：単なる精度低下ではなく、positive classを系統的に�
       (0.9435327053,0.0930522010)
     };
   \addlegendentry{非線形モデル：8セル}
-  \addplot[only marks,mark=square*,mark size=7pt,Teal,draw=TealDark,very thick]
+  \addplot[only marks,mark=square*,mark size=8pt,Teal,draw=TealDark,very thick]
     coordinates {(0.7944732904,0.7950573564) (0.8306807280,0.8413519859)};
   \addlegendentry{固定特徴の線形モデル：2セル}
-  \node[anchor=south east,font=\fontsize{15}{18}\selectfont\bfseries,text=CoralDark]
-    at (axis cs:0.9157,0.1104) {LSTM + Momentum};
-  \node[anchor=south east,font=\fontsize{15}{18}\selectfont\bfseries,text=CoralDark]
-    at (axis cs:0.96096,0.0741) {Enc--Dec + Adam};
-  \node[anchor=west,font=\fontsize{15}{18}\selectfont\bfseries,text=CoralDark]
-    at (axis cs:0.96865,0.0833) {GRU + Adam};
+  \node[anchor=east,font=\fontsize{17}{21}\selectfont\bfseries,text=CoralDark]
+    at (axis cs:0.900,0.135) {LSTM + Momentum};
+  \node[anchor=east,font=\fontsize{17}{21}\selectfont\bfseries,text=CoralDark]
+    at (axis cs:0.945,0.055) {Enc--Dec + Adam};
 \end{axis}
 \end{tikzpicture}
 
-\vspace{-0.2cm}
-\begin{tikzpicture}
-  \node[rounded corners=0.35cm,fill=Coral,text=White,inner xsep=0.7cm,inner ysep=0.42cm,
-    font=\fontsize{22}{27}\selectfont\bfseries]
-    {最大 $\Delta$AUC：$-0.8869$（Transformer Encoder--Decoder + Adam）};
-\end{tikzpicture}
+\vspace{-0.25cm}
+\begin{beamercolorbox}[wd=\linewidth,sep=0.45cm,rounded=true,center]{alerted text}
+\color{CoralDark}\fontsize{23}{29}\selectfont\bfseries
+最大 $\Delta$AUC：$-0.8869$（Transformer Encoder--Decoder + Adam）
+\end{beamercolorbox}
 \end{block}
 
-\begin{block}{6｜何が効いている？}
-\centering
-\begin{tikzpicture}
-  \node[circle,fill=SoftBlue,draw=Blue,very thick,minimum size=4.6cm,align=center]
-    (anchor) {\textbf{Anchor}\\表現を形成};
-  \node[circle,fill=SoftCoral,draw=Coral,very thick,minimum size=4.6cm,align=center,
-    right=2.0cm of anchor]
-    (tail) {\textbf{Tail}\\強い修正勾配};
-  \draw[-{Latex[length=0.48cm]},line width=0.13cm,Coral]
-    (anchor.east) -- (tail.west);
-\end{tikzpicture}
-
-\vspace{0.25cm}
-{\fontsize{22}{27}\selectfont
-\[
-\Phi_B^m\!\left(\Phi_A^n(\theta_0)\right)
-\;\neq\;
-\Phi_A^n\!\left(\Phi_B^m(\theta_0)\right)
-\]}
-\vspace{-0.15cm}
-\begin{minipage}{0.94\linewidth}
-\centering
-非線形な更新写像は一般に可換でない。Tailはlabel poisonではなく、
-\posteremph{source labelでの大きな修正update}である。
-\end{minipage}
-\end{block}
-
-\end{minipage}
-\end{column}
-
-% -----------------------------------------------------------------------------
-\begin{column}{\colwidth}
-\hspace*{\colpad}\begin{minipage}[t]{\innerwidth}
-
-\begin{block}{7｜Isabelle/HOL：有限証明から漸近反転へ}
+\begin{block}{7｜形式証明（条件付き）：有限証明から漸近反転へ}
 \centering
 \begin{tikzpicture}[
-  node distance=1.05cm,
-  th/.style={rounded corners=0.35cm,very thick,align=center,inner sep=0.45cm,
-             minimum width=23.8cm},
-  arr/.style={-{Latex[length=0.52cm]},line width=0.14cm,color=Muted}
+  th/.style={rounded corners=0.35cm,very thick,align=center,inner sep=0.42cm,text width=27.5cm},
+  outcome/.style={rounded corners=0.32cm,very thick,align=center,text width=7.6cm,minimum height=4.5cm},
+  arr/.style={-{Latex[length=0.5cm]},line width=0.13cm,Muted}
 ]
   \node[th,fill=SoftGold,draw=Gold] (cond) {
-    \textbf{冪スケーリング条件}\\[-0.05cm]
-    {\fontsize{27}{32}\selectfont $N=K^a,\quad m=K^c,\quad \eta=K^{-b},\qquad a<2b,\; b<c<a$}
+    \textbf{冪スケーリング条件}\\[0.1cm]
+    \resizebox{0.88\linewidth}{!}{$\displaystyle N=K^a,\quad m=K^c,\quad \eta=K^{-b},\qquad a<2b,\ b<c<a$}
   };
-  \node[th,fill=SoftBlue,draw=Blue,below=of cond] (finite) {
+  \node[th,fill=SoftBlue,draw=Blue,below=0.9cm of cond] (finite) {
     \textbf{有限ステップのbridge}\\
     Anchor bound $+$ burn-in $+$ takeover $\Longrightarrow a_N<-u_N$
   };
-  \draw[arr] (cond) -- (finite);
-  \node[rounded corners=0.34cm,fill=SoftTeal,draw=Teal,very thick,align=center,
-    text width=7.1cm,minimum height=4.1cm,below left=1.25cm and -0.05cm of finite] (rare)
+  \node[outcome,fill=SoftTeal,draw=Teal,below=1.2cm of finite,xshift=-9.0cm] (rare)
     {\textbf{Tailは消える}\\$m/N\to0$\\confidence $\to0$};
-  \node[rounded corners=0.34cm,fill=SoftTeal,draw=Teal,very thick,align=center,
-    text width=7.1cm,minimum height=4.1cm,below=1.25cm of finite] (random)
-    {\textbf{Randomは良性}\\$\Pr[\text{benign}]\to1$};
-  \node[rounded corners=0.34cm,fill=SoftCoral,draw=Coral,very thick,align=center,
-    text width=7.1cm,minimum height=4.1cm,below right=1.25cm and -0.05cm of finite] (attack)
+  \node[outcome,fill=SoftTeal,draw=Teal,below=1.2cm of finite] (random)
+    {\textbf{Randomは良性}\\$\Pr[\mathrm{benign}]\to1$};
+  \node[outcome,fill=SoftCoral,draw=Coral,below=1.2cm of finite,xshift=9.0cm] (attack)
     {\textbf{Attackは反転}\\risk $\to1$\\AUC $\to0$};
+  \draw[arr] (cond) -- (finite);
   \draw[arr] (finite.south) -- ++(0,-0.55) -| (rare.north);
-  \draw[arr] (finite.south) -- (random.north);
+  \draw[arr] (finite) -- (random);
   \draw[arr] (finite.south) -- ++(0,-0.55) -| (attack.north);
   \node[rounded corners=0.34cm,fill=Navy,text=White,align=center,
-    inner xsep=0.8cm,inner ysep=0.5cm,below=1.05cm of random,
-    font=\fontsize{22}{27}\selectfont\bfseries] (exact)
-    {exact realizable AdamW、ならびに decay $=0$ の Adam};
-  \draw[arr] (rare.south) -- ++(0,-0.55) -| (exact.west);
-  \draw[arr] (random.south) -- (exact.north);
-  \draw[arr] (attack.south) -- ++(0,-0.55) -| (exact.east);
+    inner xsep=0.75cm,inner ysep=0.48cm,below=0.9cm of random,
+    font=\fontsize{21}{26}\selectfont\bfseries] (exact)
+    {exact realizable AdamW／decay $=0$ の Adam};
+  \draw[arr] (rare.south) -- ++(0,-0.45) -| (exact.west);
+  \draw[arr] (random) -- (exact);
+  \draw[arr] (attack.south) -- ++(0,-0.45) -| (exact.east);
 \end{tikzpicture}
 
-\vspace{0.30cm}
-\begin{beamercolorbox}[wd=\linewidth,sep=0.42cm,rounded=true,center]{alerted text}
-\color{Ink}\fontsize{20}{25}\selectfont
-中心定理：\texttt{rz\_power\_law\_adamw\_inversion} / \texttt{rz\_power\_law\_adam\_inversion}
-\end{beamercolorbox}
+\vspace{0.4cm}
+{\fontsize{18}{23}\selectfont
+中心定理：\texttt{rz\_power\_law\_adamw\_inversion}／
+\texttt{rz\_power\_law\_adam\_inversion}}
 \end{block}
 
 \begin{block}{8｜証明スタックとoptimizer範囲}
 \centering
 \begin{tikzpicture}[
-  layer/.style={rounded corners=0.25cm,minimum height=2.25cm,align=center,
-                font=\fontsize{19}{23}\selectfont\bfseries,very thick},
-  dep/.style={-{Latex[length=0.42cm]},very thick,color=Muted}
+  layer/.style={rounded corners=0.28cm,minimum height=2.7cm,align=center,
+                font=\fontsize{21}{26}\selectfont\bfseries,very thick},
+  dep/.style={-{Latex[length=0.44cm]},very thick,Muted}
 ]
-  \node[layer,fill=SoftBlue,draw=Blue,minimum width=23.8cm] (core)
+  \node[layer,fill=SoftBlue,draw=Blue,minimum width=28.0cm,text width=27.2cm] (core)
     {\texttt{formalization/core}\\order-only inversion・finite-population concentration・asymptotics};
-  \node[layer,fill=SoftGold,draw=Gold,minimum width=5.2cm,below left=1.05cm and -0.2cm of core] (sgd) {SGD};
-  \node[layer,fill=SoftGold,draw=Gold,minimum width=5.2cm,right=0.7cm of sgd] (mom) {Momentum};
-  \node[layer,fill=SoftTeal,draw=Teal,minimum width=5.2cm,right=0.7cm of mom] (adam) {Adam};
-  \node[layer,fill=SoftTeal,draw=Teal,minimum width=5.2cm,right=0.7cm of adam] (adamw) {AdamW};
-  \foreach \x in {sgd,mom,adam,adamw}{\draw[dep] (core.south) -- ++(0,-0.42) -| (\x.north);}
+  \node[layer,fill=SoftGold,draw=Gold,minimum width=6.2cm,below left=1.0cm and -0.2cm of core] (sgd) {SGD};
+  \node[layer,fill=SoftGold,draw=Gold,minimum width=6.2cm,right=0.55cm of sgd] (mom) {Momentum};
+  \node[layer,fill=SoftTeal,draw=Teal,minimum width=6.2cm,right=0.55cm of mom] (adam) {Adam};
+  \node[layer,fill=SoftTeal,draw=Teal,minimum width=6.2cm,right=0.55cm of adam] (adamw) {AdamW};
+  \foreach \x in {sgd,mom,adam,adamw}{\draw[dep] (core.south) -- ++(0,-0.4) -| (\x.north);}
 \end{tikzpicture}
 
-\vspace{0.28cm}
+\vspace{0.35cm}
 \begin{itemize}
   \item bias-corrected moment、weight decay、2座標realizable dynamicsを実装通りに定義
   \item strict build：\texttt{quick\_and\_dirty=false}
@@ -366,54 +333,49 @@ AUC $<0.5$：単なる精度低下ではなく、positive classを系統的に�
 \end{block}
 
 \begin{block}{9｜再現方法と適用範囲}
-\begin{columns}[T,totalwidth=\linewidth]
-\begin{column}{0.63\linewidth}
+\begin{minipage}[t]{25.8cm}
 \begin{tikzpicture}
-  \node[rounded corners=0.34cm,fill=Ink,text=White,text width=14.7cm,
-    inner sep=0.60cm,align=left,font=\fontsize{20}{25}\selectfont\ttfamily]
+  \node[rounded corners=0.34cm,fill=Ink,text=White,text width=23.8cm,
+    inner sep=0.65cm,align=left,font=\fontsize{21}{27}\selectfont\ttfamily]
     {uv run bad-curriculum\\
      \quad --device cuda\\
      \quad --output-dir results/order-only};
 \end{tikzpicture}
-\vspace{0.3cm}
 
+\vspace{0.3cm}
 \textbf{重要な境界：}
 \begin{itemize}
-  \item すべての順序が有害なのではない。固定特徴の線形モデルはfull-scaleで低下しない。
-  \item 形式証明は明示的なorder-only modelに対するもの。任意のLSTMへの無条件定理ではない。
+  \item 固定特徴の線形モデルはfull-scaleで低下しない。
+  \item 形式証明は明示的なorder-only modelに対する条件付き結果。任意のLSTMへの無条件定理ではない。
   \item Tail選択は別selectorで行うが、targetの訓練labelは常にsource label。
 \end{itemize}
-\end{column}
-\begin{column}{0.35\linewidth}
+\end{minipage}\hfill
+\begin{minipage}[t]{9.5cm}
 \centering
-\qrcode[height=7.3cm]{https://github.com/tani/bad-curriculum}
+\qrcode[height=7.0cm]{https://github.com/tani/bad-curriculum}
 \vspace{0.35cm}
 
-{\fontsize{19}{23}\selectfont\bfseries
-コード・結果・形式証明}
+{\fontsize{19}{24}\selectfont\bfseries コード・結果・形式証明}
 
-\vspace{0.20cm}
-{\fontsize{16}{20}\selectfont
-\texttt{github.com/tani/}\\[-0.05cm]
-\texttt{bad-curriculum}}
-\end{column}
-\end{columns}
+\vspace{0.25cm}
+{\fontsize{16}{20}\selectfont\texttt{github.com/tani/}\\\texttt{bad-curriculum}}
+\end{minipage}
 \end{block}
 
-\end{minipage}
-\end{column}
-\end{columns}
+\end{minipage}%
+\hspace*{2.1cm}%
+}
 
-% Footer, full bleed.
+% Footer, full bleed with bounded nodes.
 \begin{tikzpicture}[remember picture,overlay]
-  \node[anchor=west,text=White,inner sep=0pt]
-    at ([xshift=2.7cm,yshift=1.58cm]current page.south west)
-    {\fontsize{19}{23}\selectfont\bfseries
-      結論：データ集合を変えなくても、最後に何を見せるかが最終classifierを決めうる。};
-  \node[anchor=east,text=White,inner sep=0pt]
-    at ([xshift=-2.0cm,yshift=1.58cm]current page.south east)
-    {\fontsize{16}{20}\selectfont
-      Yelp Polarity \;｜\; seed 20260911 \;｜\; MIT License \;｜\; v1.6.0};
+  \node[anchor=west,text=White,align=left,inner sep=0pt,text width=52cm]
+    at ([xshift=2.5cm,yshift=2.25cm]current page.south west)
+    {\fontsize{22}{28}\selectfont\bfseries
+     結論：データ集合を変えなくても、最後に何を見せるかが最終classifierを決めうる。};
+  \node[anchor=east,text=White,align=right,inner sep=0pt,text width=25cm]
+    at ([xshift=-2.0cm,yshift=2.25cm]current page.south east)
+    {\fontsize{17}{22}\selectfont
+     Yelp Polarity｜seed 20260911\\MIT License｜v1.6.0};
 \end{tikzpicture}
 
 \end{frame}
