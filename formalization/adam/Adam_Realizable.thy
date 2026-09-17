@@ -1159,6 +1159,474 @@ proof -
   show ?thesis using compare logarithmic by linarith
 qed
 
+section \<open>Tail sign persistence\<close>
+
+lemma rz_tail_gradient_positive:
+  assumes tail: "\<not> b k"
+  shows "0 < Ga b k"
+proof -
+  have shape: "Ga b k = sigmoid (A b k - Uc b k)"
+    using tail by (simp add: signed_bool_def)
+  show ?thesis unfolding shape by (rule sigmoid_pos)
+qed
+
+lemma rz_tail_gradient_floor:
+  assumes tail: "\<not> b k" and anonneg: "0 \<le> A b k" and usmall: "Uc b k \<le> 1"
+  shows "sigmoid (-1) \<le> Ga b k"
+proof -
+  have input: "-1 \<le> A b k - Uc b k" using anonneg usmall by linarith
+  have mono: "0 \<le> sigmoid (A b k - Uc b k) - sigmoid (-1)"
+    by (rule sigmoid_difference_bounds(1)[OF input])
+  have shape: "Ga b k = sigmoid (A b k - Uc b k)"
+    using tail by (simp add: signed_bool_def)
+  show ?thesis using mono shape by linarith
+qed
+
+lemma rz_tail_negative_step:
+  assumes tail: "\<not> b k" and aneg: "A b k < 0" and mnonneg: "0 \<le> Ma b k"
+  shows "A b (Suc k) < 0 \<and> 0 < Ma b (Suc k)"
+proof -
+  have gpos: "0 < Ga b k"
+    by (rule rz_tail_gradient_positive[where b=b and k=k, OF tail])
+  have first: "0 \<le> beta1 * Ma b k"
+    by (rule mult_nonneg_nonneg[OF beta1_nonneg mnonneg])
+  have second: "0 < (1-beta1) * Ga b k"
+    by (rule mult_pos_pos) (use beta1_lt gpos in auto)
+  have mpos: "0 < Ma b (Suc k)" using first second by simp
+  have mhpos: "0 < MHa b (Suc k)"
+    by (rule divide_pos_pos[OF mpos aw_bias_positive])
+  have decayed: "(1-eta*decay) * A b k \<le> 0"
+    by (rule mult_nonneg_nonpos) (use decay_step aneg in auto)
+  have numerator_pos: "0 < eta * MHa b (Suc k)"
+    by (rule mult_pos_pos[OF eta_pos mhpos])
+  have update_pos: "0 < eta * MHa b (Suc k) / Da b (Suc k)"
+    by (rule divide_pos_pos[OF numerator_pos rz_da_positive])
+  have anew: "A b (Suc k) < 0" using decayed update_pos by simp
+  show ?thesis using anew mpos by simp
+qed
+
+lemma rz_crossing_positive_moment:
+  assumes anonneg: "0 \<le> A b k" and next_negative: "A b (Suc k) < 0"
+  shows "0 < Ma b (Suc k)"
+proof (rule ccontr)
+  assume not_positive: "\<not> 0 < Ma b (Suc k)"
+  have mnonpos: "Ma b (Suc k) \<le> 0" using not_positive by simp
+  have mhnonpos: "MHa b (Suc k) \<le> 0"
+    by (rule divide_nonpos_pos[OF mnonpos aw_bias_positive])
+  have decayed: "0 \<le> (1-eta*decay) * A b k"
+    by (rule mult_nonneg_nonneg) (use decay_step anonneg in auto)
+  have numerator_nonpos: "eta * MHa b (Suc k) \<le> 0"
+    by (rule mult_nonneg_nonpos) (use eta_pos mhnonpos in auto)
+  have update_nonpos: "eta * MHa b (Suc k) / Da b (Suc k) \<le> 0"
+    by (rule divide_nonpos_pos[OF numerator_nonpos rz_da_positive])
+  have "0 \<le> A b (Suc k)" using decayed update_nonpos by simp
+  then show False using next_negative by simp
+qed
+
+lemma rz_tail_negative_has_positive_moment:
+  assumes tail: "\<And>i. i < j \<Longrightarrow> \<not> b (n+i)"
+    and start_nonnegative: "0 \<le> A b n"
+    and final_negative: "A b (n+j) < 0"
+  shows "0 < Ma b (n+j)"
+  using tail final_negative
+proof (induction j)
+  case 0
+  then show ?case using start_nonnegative by simp
+next
+  case (Suc j)
+  have tail_prefix: "\<And>i. i < j \<Longrightarrow> \<not> b (n+i)"
+    using Suc.prems(1) by simp
+  have tail_last: "\<not> b (n+j)" using Suc.prems(1) by simp
+  have final_suc: "A b (Suc (n+j)) < 0" using Suc.prems(2) by simp
+  show ?case
+  proof (cases "A b (n+j) < 0")
+    case True
+    have mpos: "0 < Ma b (n+j)" by (rule Suc.IH[OF tail_prefix True])
+    have step: "A b (Suc (n+j)) < 0 \<and> 0 < Ma b (Suc (n+j))"
+      by (rule rz_tail_negative_step[where b=b and k="n+j", OF tail_last True])
+        (use mpos in auto)
+    show ?thesis using step by simp
+  next
+    case False
+    have anonneg: "0 \<le> A b (n+j)" using False by simp
+    have mpos: "0 < Ma b (Suc (n+j))"
+      by (rule rz_crossing_positive_moment[OF anonneg final_suc])
+    show ?thesis using mpos by simp
+  qed
+qed
+
+lemma rz_tail_negative_persists:
+  assumes tail: "\<And>i. i < j \<Longrightarrow> \<not> b (k+i)"
+    and negative: "A b k < 0" and moment_nonnegative: "0 \<le> Ma b k"
+  shows "A b (k+j) < 0 \<and> 0 \<le> Ma b (k+j)"
+  using tail
+proof (induction j)
+  case 0
+  show ?case using negative moment_nonnegative by simp
+next
+  case (Suc j)
+  have tail_prefix: "\<And>i. i < j \<Longrightarrow> \<not> b (k+i)" using Suc.prems by simp
+  have tail_last: "\<not> b (k+j)" using Suc.prems by simp
+  have ih: "A b (k+j) < 0 \<and> 0 \<le> Ma b (k+j)"
+    by (rule Suc.IH[OF tail_prefix])
+  have step: "A b (Suc (k+j)) < 0 \<and> 0 < Ma b (Suc (k+j))"
+    by (rule rz_tail_negative_step[where b=b and k="k+j", OF tail_last])
+      (use ih in auto)
+  show ?case using step by simp
+qed
+
+lemma rz_tail_all_nonnegative:
+  assumes tail: "\<And>i. i < m \<Longrightarrow> \<not> b (n+i)"
+    and start_nonnegative: "0 \<le> A b n"
+    and final_nonnegative: "0 \<le> A b (n+m)"
+    and jm: "j \<le> m"
+  shows "0 \<le> A b (n+j)"
+proof (rule ccontr)
+  assume not_nonnegative: "\<not> 0 \<le> A b (n+j)"
+  have negative: "A b (n+j) < 0" using not_nonnegative by simp
+  have jpos: "0 < j"
+  proof (rule ccontr)
+    assume "\<not> 0 < j"
+    then have "j = 0" by simp
+    then show False using start_nonnegative negative by simp
+  qed
+  have tail_prefix: "\<And>i. i < j \<Longrightarrow> \<not> b (n+i)" using tail jm by simp
+  have moment_positive: "0 < Ma b (n+j)"
+    by (rule rz_tail_negative_has_positive_moment[OF tail_prefix start_nonnegative negative])
+  have tail_shift: "\<And>i. i < m-j \<Longrightarrow> \<not> b ((n+j)+i)"
+  proof -
+    fix i
+    assume imj: "i < m-j"
+    have jim: "j+i < m" using jm imj by arith
+    have shifted: "\<not> b (n+(j+i))" by (rule tail[OF jim])
+    show "\<not> b ((n+j)+i)" using shifted by (simp add: add.assoc)
+  qed
+  have persists: "A b ((n+j)+(m-j)) < 0 \<and> 0 \<le> Ma b ((n+j)+(m-j))"
+    by (rule rz_tail_negative_persists[OF tail_shift negative])
+      (use moment_positive in auto)
+  have restore: "(n+j)+(m-j) = n+m" using jm by arith
+  show False using persists final_nonnegative restore by simp
+qed
+
+lemma rz_ma_lower_one: "-1 \<le> Ma b k"
+proof -
+  have abs_bound: "abs (Ma b k) \<le> 1-beta1^k" by (rule rz_ma_bound)
+  have power_nonnegative: "0 \<le> beta1^k"
+    by (rule zero_le_power[OF beta1_nonneg])
+  show ?thesis using abs_bound power_nonnegative by (simp add: abs_le_iff)
+qed
+
+lemma rz_tail_moment_lower:
+  assumes tail: "\<And>i. i < j \<Longrightarrow> \<not> b (n+i)"
+    and nonnegative: "\<And>i. i < j \<Longrightarrow> 0 \<le> A b (n+i)"
+    and auxiliary: "\<And>i. i < j \<Longrightarrow> Uc b (n+i) \<le> 1"
+  shows "sigmoid (-1) - (1 + sigmoid (-1)) * beta1^j \<le> Ma b (n+j)"
+  using tail nonnegative auxiliary
+proof (induction j)
+  case 0
+  have identity: "sigmoid (-1) - (1 + sigmoid (-1)) * beta1^0 = -1"
+    by simp
+  show ?case unfolding identity by (rule rz_ma_lower_one)
+next
+  case (Suc j)
+  have tail_prefix: "\<And>i. i < j \<Longrightarrow> \<not> b (n+i)" using Suc.prems(1) by simp
+  have nonnegative_prefix: "\<And>i. i < j \<Longrightarrow> 0 \<le> A b (n+i)"
+    using Suc.prems(2) by simp
+  have auxiliary_prefix: "\<And>i. i < j \<Longrightarrow> Uc b (n+i) \<le> 1"
+    using Suc.prems(3) by simp
+  have ih: "sigmoid (-1) - (1 + sigmoid (-1)) * beta1^j \<le> Ma b (n+j)"
+    by (rule Suc.IH[OF tail_prefix nonnegative_prefix auxiliary_prefix])
+  have tail_last: "\<not> b (n+j)" using Suc.prems(1) by simp
+  have nonnegative_last: "0 \<le> A b (n+j)" using Suc.prems(2) by simp
+  have auxiliary_last: "Uc b (n+j) \<le> 1" using Suc.prems(3) by simp
+  have gradient_floor: "sigmoid (-1) \<le> Ga b (n+j)"
+    by (rule rz_tail_gradient_floor[OF tail_last nonnegative_last auxiliary_last])
+  have first: "beta1 * (sigmoid (-1) - (1 + sigmoid (-1)) * beta1^j)
+      \<le> beta1 * Ma b (n+j)"
+    by (rule mult_left_mono[OF ih beta1_nonneg])
+  have second: "(1-beta1) * sigmoid (-1) \<le> (1-beta1) * Ga b (n+j)"
+    by (rule mult_left_mono[OF gradient_floor]) (use beta1_lt in auto)
+  have identity: "beta1 * (sigmoid (-1) - (1 + sigmoid (-1)) * beta1^j) +
+      (1-beta1) * sigmoid (-1) =
+      sigmoid (-1) - (1 + sigmoid (-1)) * beta1^(Suc j)"
+    by (simp add: algebra_simps)
+  show ?case using first second identity by simp
+qed
+
+lemma rz_tail_descent:
+  assumes anonneg: "0 \<le> A b k" and rho_pos: "0 < rho"
+    and moment_lower: "rho \<le> Ma b (Suc k)"
+  shows "A b (Suc k) \<le> A b k - eta * rho / (1+eps)"
+proof -
+  have bias: "0 < 1-beta1^(Suc k)" "1-beta1^(Suc k) \<le> 1"
+    using aw_bias_bounds[OF beta1_nonneg beta1_lt, of k] by auto
+  have scaled_bias: "rho * (1-beta1^(Suc k)) \<le> rho"
+  proof -
+    have "rho * (1-beta1^(Suc k)) \<le> rho * 1"
+      by (rule mult_left_mono[OF bias(2)]) (use rho_pos in linarith)
+    then show ?thesis by simp
+  qed
+  have numerator: "rho * (1-beta1^(Suc k)) \<le> Ma b (Suc k)"
+    using scaled_bias moment_lower by linarith
+  have mh_lower: "rho \<le> MHa b (Suc k)"
+    using numerator bias(1) by (simp only: le_divide_eq if_True)
+  have denominator_pos: "0 < Da b (Suc k)" by (rule rz_da_positive)
+  have one_eps_pos: "0 < 1+eps" using eps_pos by linarith
+  have factor_nonnegative: "0 \<le> rho / Da b (Suc k)"
+    using rho_pos denominator_pos by simp
+  have product: "(rho / Da b (Suc k)) * Da b (Suc k) \<le>
+      (rho / Da b (Suc k)) * (1+eps)"
+    by (rule mult_left_mono[OF rz_da_bounds(2) factor_nonnegative])
+  have cancel: "(rho / Da b (Suc k)) * Da b (Suc k) = rho"
+    using denominator_pos by simp
+  have target: "rho \<le> (rho / Da b (Suc k)) * (1+eps)"
+    using product cancel by linarith
+  have denom_lower: "rho / (1+eps) \<le> rho / Da b (Suc k)"
+    using target one_eps_pos by (subst divide_le_eq) simp
+  have moment_divided: "rho / Da b (Suc k) \<le> MHa b (Suc k) / Da b (Suc k)"
+    by (rule divide_right_mono[OF mh_lower]) (use denominator_pos in linarith)
+  have direction: "rho / (1+eps) \<le> MHa b (Suc k) / Da b (Suc k)"
+    by (rule order_trans[OF denom_lower moment_divided])
+  have scaled: "eta * rho / (1+eps) \<le> eta * (MHa b (Suc k) / Da b (Suc k))"
+    using mult_left_mono[OF direction, of eta] eta_pos by simp
+  have contraction: "(1-eta*decay) * A b k \<le> A b k"
+  proof -
+    have removed: "0 \<le> (eta*decay) * A b k"
+      by (rule mult_nonneg_nonneg) (use eta_pos decay_nonneg anonneg in auto)
+    show ?thesis using removed by (simp add: algebra_simps)
+  qed
+  show ?thesis using scaled contraction by simp
+qed
+
+lemma rz_prefix_weight_upper:
+  "A b (n+j) \<le> A b n + real j * (2*eta/eps)"
+proof -
+  have step: "A b (n+Suc i) \<le> A b (n+i) + 2*eta/eps" for i
+    using rz_jump_bound[where b=b and k="n+i"] by (simp add: abs_le_iff)
+  show ?thesis
+    using aw_affine_iteration_upper[where n=j and f="\<lambda>i. A b (n+i)"
+      and d="2*eta/eps"] step by simp
+qed
+
+theorem rz_anchor_tail_inversion:
+  assumes anchor: "\<And>i. i < n \<Longrightarrow> b i"
+    and tail: "\<And>i. i < m \<Longrightarrow> \<not> b (n+i)"
+    and auxiliary: "\<And>i. i < m \<Longrightarrow> Uc b (n+i) \<le> 1"
+    and anchor_bound: "A b n \<le> h"
+    and burn_length: "J \<le> m"
+    and burn_momentum: "(1 + sigmoid (-1)) * beta1^J \<le> sigmoid (-1) / 2"
+    and takeover: "h + real J * (2*eta/eps) -
+      real (m-J) * (eta * (sigmoid (-1) / 2) / (1+eps)) < 0"
+  shows "A b (n+m) < 0"
+proof (rule ccontr)
+  assume not_negative: "\<not> A b (n+m) < 0"
+  have final_nonnegative: "0 \<le> A b (n+m)" using not_negative by simp
+  have start_nonnegative: "0 \<le> A b n"
+    using rz_anchor_prefix[where b=b and n=n] anchor by simp
+  have all_nonnegative: "0 \<le> A b (n+j)" if "j \<le> m" for j
+    by (rule rz_tail_all_nonnegative[OF tail start_nonnegative final_nonnegative that])
+  have moment_floor: "sigmoid (-1) / 2 \<le> Ma b (n+j)"
+    if Jj: "J \<le> j" and jm: "j \<le> m" for j
+  proof -
+    have lower: "sigmoid (-1) - (1 + sigmoid (-1)) * beta1^j \<le> Ma b (n+j)"
+      by (rule rz_tail_moment_lower)
+        (use tail auxiliary all_nonnegative jm in auto)
+    have power: "beta1^j \<le> beta1^J"
+      by (rule aw_power_antimono) (use beta1_nonneg beta1_lt Jj in auto)
+    have coefficient_positive: "0 < 1 + sigmoid (-1)"
+      using sigmoid_pos[of "-1"] by linarith
+    have scaled: "(1 + sigmoid (-1)) * beta1^j \<le>
+        (1 + sigmoid (-1)) * beta1^J"
+      by (rule mult_left_mono[OF power]) (use coefficient_positive in linarith)
+    show ?thesis using lower scaled burn_momentum by linarith
+  qed
+  let ?d = "eta * (sigmoid (-1) / 2) / (1+eps)"
+  have descent: "A b (n+J+Suc i) \<le> A b (n+J+i) - ?d"
+    if im: "i < m-J" for i
+  proof -
+    have Jim: "J+i < m" using burn_length im by arith
+    have current_nonnegative: "0 \<le> A b (n+J+i)"
+      using all_nonnegative[of "J+i"] Jim by (simp add: add.assoc)
+    have next_le: "Suc (J+i) \<le> m" using Jim by arith
+    have next_moment: "sigmoid (-1) / 2 \<le> Ma b (Suc (n+J+i))"
+      using moment_floor[of "Suc (J+i)"] next_le by (simp add: add.assoc)
+    have rho_positive: "0 < sigmoid (-1) / 2" using sigmoid_pos[of "-1"] by simp
+    show ?thesis
+      using rz_tail_descent[where b=b and k="n+J+i" and rho="sigmoid (-1)/2",
+        OF current_nonnegative rho_positive next_moment] by simp
+  qed
+  have total: "A b (n+m) \<le> A b (n+J) - real (m-J) * ?d"
+  proof -
+    have raw: "A b (n+J+(m-J)) \<le> A b (n+J+0) + real (m-J) * (-?d)"
+    proof (rule aw_affine_iteration_upper[where n="m-J"
+        and f="\<lambda>i. A b (n+J+i)" and d="-?d"])
+      fix i
+      assume "i < m-J"
+      then show "A b (n+J+Suc i) \<le> A b (n+J+i) + -?d"
+        using descent[of i] by linarith
+    qed
+    show ?thesis using raw burn_length by (simp add: algebra_simps)
+  qed
+  have burn: "A b (n+J) \<le> h + real J * (2*eta/eps)"
+    using rz_prefix_weight_upper[where b=b and n=n and j=J] anchor_bound by linarith
+  show False using total burn takeover final_nonnegative by linarith
+qed
+
+lemma rz_tail_terminal_margin:
+  assumes tail: "\<not> b k" and negative: "A b k < 0"
+    and moment_positive: "0 < Ma b k" and auxiliary: "Uc b k \<le> 1"
+    and decay_half: "eta * decay \<le> 1/2"
+    and rate_small: "eta * ((1-beta1) * sigmoid (-2) / (1+eps)) \<le> 1/2"
+  shows "A b (Suc k) \<le> - eta * ((1-beta1) * sigmoid (-2) / (1+eps))"
+proof -
+  let ?rho = "(1-beta1) * sigmoid (-2)"
+  let ?c = "?rho / (1+eps)"
+  have rho_positive: "0 < ?rho"
+    by (rule mult_pos_pos) (use beta1_lt sigmoid_pos[of "-2"] in auto)
+  have gradient_positive: "0 < Ga b k"
+    by (rule rz_tail_gradient_positive[where b=b and k=k, OF tail])
+  have old_nonnegative: "0 \<le> beta1 * Ma b k"
+    by (rule mult_nonneg_nonneg) (use beta1_nonneg moment_positive in auto)
+  have new_positive: "0 < (1-beta1) * Ga b k"
+    by (rule mult_pos_pos) (use beta1_lt gradient_positive in auto)
+  have next_moment_positive: "0 < Ma b (Suc k)"
+    using old_nonnegative new_positive by simp
+  have next_mh_positive: "0 < MHa b (Suc k)"
+    by (rule divide_pos_pos[OF next_moment_positive aw_bias_positive])
+  have update_positive: "0 < eta * MHa b (Suc k) / Da b (Suc k)"
+  proof -
+    have numerator_positive: "0 < eta * MHa b (Suc k)"
+      by (rule mult_pos_pos[OF eta_pos next_mh_positive])
+    show ?thesis by (rule divide_pos_pos[OF numerator_positive rz_da_positive])
+  qed
+  show ?thesis
+  proof (cases "A b k \<le> -1")
+    case True
+    have factor_nonnegative: "0 \<le> 1-eta*decay" using decay_step by simp
+    have factor_half: "1/2 \<le> 1-eta*decay" using decay_half by linarith
+    have scaled: "(1-eta*decay) * A b k \<le> (1-eta*decay) * (-1)"
+      by (rule mult_left_mono[OF True factor_nonnegative])
+    have neg_factor_raw: "-(1-eta*decay) \<le> -(1/2)"
+      using factor_half by argo
+    have neg_factor: "(1-eta*decay) * (-1) \<le> -1/2"
+      using neg_factor_raw by simp
+    have contracted: "(1-eta*decay) * A b k \<le> -1/2"
+      by (rule order_trans[OF scaled neg_factor])
+    have final_half: "A b (Suc k) < -1/2"
+      using contracted update_positive by simp
+    show ?thesis using final_half rate_small by linarith
+  next
+    case False
+    have above_minus_one: "-1 < A b k" using False by simp
+    have input: "-2 \<le> A b k - Uc b k" using above_minus_one auxiliary by linarith
+    have mono: "0 \<le> sigmoid (A b k - Uc b k) - sigmoid (-2)"
+      by (rule sigmoid_difference_bounds(1)[OF input])
+    have gradient_shape: "Ga b k = sigmoid (A b k - Uc b k)"
+      using tail by (simp add: signed_bool_def)
+    have gradient_floor: "sigmoid (-2) \<le> Ga b k"
+      using mono gradient_shape by linarith
+    have new_lower: "?rho \<le> (1-beta1) * Ga b k"
+      by (rule mult_left_mono[OF gradient_floor]) (use beta1_lt in auto)
+    have moment_lower: "?rho \<le> Ma b (Suc k)"
+      using old_nonnegative new_lower by simp
+    have bias: "0 < 1-beta1^(Suc k)" "1-beta1^(Suc k) \<le> 1"
+      using aw_bias_bounds[OF beta1_nonneg beta1_lt, of k] by auto
+    have scaled_bias: "?rho * (1-beta1^(Suc k)) \<le> ?rho"
+    proof -
+      have "?rho * (1-beta1^(Suc k)) \<le> ?rho * 1"
+        by (rule mult_left_mono[OF bias(2)]) (use rho_positive in linarith)
+      then show ?thesis by simp
+    qed
+    have numerator: "?rho * (1-beta1^(Suc k)) \<le> Ma b (Suc k)"
+      using scaled_bias moment_lower by linarith
+    have mh_lower: "?rho \<le> MHa b (Suc k)"
+      using numerator bias(1) by (simp only: le_divide_eq if_True)
+    have denominator_positive: "0 < Da b (Suc k)" by (rule rz_da_positive)
+    have one_eps_positive: "0 < 1+eps" using eps_pos by linarith
+    have factor_nonnegative: "0 \<le> ?rho / Da b (Suc k)"
+      using rho_positive denominator_positive by simp
+    have product: "(?rho / Da b (Suc k)) * Da b (Suc k) \<le>
+        (?rho / Da b (Suc k)) * (1+eps)"
+      by (rule mult_left_mono[OF rz_da_bounds(2) factor_nonnegative])
+    have cancel: "(?rho / Da b (Suc k)) * Da b (Suc k) = ?rho"
+      using denominator_positive by simp
+    have target: "?rho \<le> (?rho / Da b (Suc k)) * (1+eps)"
+      using product cancel by linarith
+    have denom_lower: "?c \<le> ?rho / Da b (Suc k)"
+      using target one_eps_positive by (subst divide_le_eq) simp
+    have moment_divided: "?rho / Da b (Suc k) \<le> MHa b (Suc k) / Da b (Suc k)"
+      by (rule divide_right_mono[OF mh_lower]) (use denominator_positive in linarith)
+    have direction: "?c \<le> MHa b (Suc k) / Da b (Suc k)"
+      by (rule order_trans[OF denom_lower moment_divided])
+    have scaled_direction: "eta * ?c \<le> eta * (MHa b (Suc k) / Da b (Suc k))"
+      by (rule mult_left_mono[OF direction]) (use eta_pos in linarith)
+    have contracted_nonpositive: "(1-eta*decay) * A b k \<le> 0"
+      by (rule mult_nonneg_nonpos) (use decay_step negative in auto)
+    show ?thesis using scaled_direction contracted_nonpositive by simp
+  qed
+qed
+
+theorem rz_anchor_tail_strict_dominance:
+  assumes anchor: "\<And>i. i < n \<Longrightarrow> b i"
+    and tail: "\<And>i. i < m \<Longrightarrow> \<not> b (n+i)"
+    and total_count: "n+m \<le> N" and tail_positive: "0 < m"
+    and anchor_bound: "A b n \<le> h"
+    and burn_length: "J \<le> m-1"
+    and burn_momentum: "(1 + sigmoid (-1)) * beta1^J \<le> sigmoid (-1) / 2"
+    and takeover: "h + real J * (2*eta/eps) -
+      real ((m-1)-J) * (eta * (sigmoid (-1) / 2) / (1+eps)) < 0"
+    and auxiliary_small: "UB N \<le> 1"
+    and decay_half: "eta * decay \<le> 1/2"
+    and rate_small: "eta * ((1-beta1) * sigmoid (-2) / (1+eps)) \<le> 1/2"
+    and auxiliary_dominated:
+      "UB N < eta * ((1-beta1) * sigmoid (-2) / (1+eps))"
+  shows "A b (n+m) < - Uc b (n+m)"
+proof -
+  let ?c = "(1-beta1) * sigmoid (-2) / (1+eps)"
+  have coefficient_nonnegative: "0 \<le> eta * kappa^2 / eps"
+    using eta_pos kappa_pos eps_pos by simp
+  have auxiliary_bound: "Uc b (n+j) \<le> UB N" if jm: "j \<le> m" for j
+  proof -
+    have trajectory: "Uc b (n+j) \<le> real (n+j) * (eta * kappa^2 / eps)"
+      by (rule rz_u_bounds(2))
+    have index_le: "n+j \<le> N" using jm total_count by arith
+    have scaled: "real (n+j) * (eta * kappa^2 / eps) \<le>
+        real N * (eta * kappa^2 / eps)"
+      by (rule mult_right_mono[OF of_nat_mono[OF index_le] coefficient_nonnegative])
+    show ?thesis using trajectory scaled by simp
+  qed
+  have tail_prefix: "\<And>i. i < m-1 \<Longrightarrow> \<not> b (n+i)" using tail by auto
+  have auxiliary_prefix: "\<And>i. i < m-1 \<Longrightarrow> Uc b (n+i) \<le> 1"
+  proof -
+    fix i
+    assume "i < m-1"
+    then have im: "i \<le> m" by arith
+    have ub: "Uc b (n+i) \<le> UB N" by (rule auxiliary_bound[OF im])
+    show "Uc b (n+i) \<le> 1" using ub auxiliary_small by linarith
+  qed
+  have penultimate_negative: "A b (n+(m-1)) < 0"
+    by (rule rz_anchor_tail_inversion[where b=b and n=n and m="m-1" and J=J
+          and h=h, OF anchor tail_prefix auxiliary_prefix anchor_bound burn_length
+          burn_momentum takeover])
+  have start_nonnegative: "0 \<le> A b n"
+    using rz_anchor_prefix[where b=b and n=n] anchor by simp
+  have penultimate_moment: "0 < Ma b (n+(m-1))"
+    by (rule rz_tail_negative_has_positive_moment[OF tail_prefix start_nonnegative
+          penultimate_negative])
+  have last_index: "m-1 < m" using tail_positive by arith
+  have last_tail: "\<not> b (n+(m-1))" by (rule tail[OF last_index])
+  have penultimate_auxiliary: "Uc b (n+(m-1)) \<le> 1"
+    using auxiliary_bound[of "m-1"] auxiliary_small by linarith
+  have terminal: "A b (Suc (n+(m-1))) \<le> - eta * ?c"
+    by (rule rz_tail_terminal_margin[OF last_tail penultimate_negative
+          penultimate_moment penultimate_auxiliary decay_half rate_small])
+  have restore: "Suc (n+(m-1)) = n+m" using tail_positive by arith
+  have final_weight: "A b (n+m) \<le> - eta * ?c" using terminal restore by simp
+  have final_auxiliary: "Uc b (n+m) < eta * ?c"
+    using auxiliary_bound[of m] auxiliary_dominated by linarith
+  show ?thesis using final_weight final_auxiliary by linarith
+qed
+
 section \<open>Strict dominance over the second coordinate and realizable metrics\<close>
 
 abbreviation Abenign where
