@@ -9,6 +9,7 @@ session "Bad_Curriculum" = "HOL-Probability" +
     Order_Only_Inversion
     Finite_Population_Hoeffding
     Order_Only_Inversion_Extensions
+    Persistent_Epoch_Inversion
     SGD_Order_Only
     Momentum_SGD_Order_Only
     Adam_Core
@@ -17,3 +18,4 @@ session "Bad_Curriculum" = "HOL-Probability" +
     Adam_Order_Only
     Adam_Asymptotics
     AdamW_Order_Only
+    All_Optimizer_Persistent_Inversion

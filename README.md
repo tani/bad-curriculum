@@ -194,6 +194,7 @@ extensions live under `formalization/core/`:
 - `Order_Only_Inversion.thy`
 - `Finite_Population_Hoeffding.thy`
 - `Order_Only_Inversion_Extensions.thy`
+- `Persistent_Epoch_Inversion.thy`
 
 Optimizer-specific entry theories live under the corresponding CLI names:
 
@@ -201,6 +202,7 @@ Optimizer-specific entry theories live under the corresponding CLI names:
 - `formalization/momentum-sgd/Momentum_SGD_Order_Only.thy`
 - `formalization/adam/Adam_Order_Only.thy`
 - `formalization/adamw/AdamW_Order_Only.thy`
+- `formalization/All_Optimizer_Persistent_Inversion.thy`
 
 Each entry theory defines the optimizer's exact scalar state recurrence and
 exports finite Anchor → Counterexample Tail inversion and clean-test risk/AUC
@@ -208,6 +210,15 @@ theorems. Adam and AdamW share the bias-corrected moment core in
 `formalization/adam/Adam_Core.thy`; Adam specializes decoupled weight decay to
 zero, while AdamW retains a nonnegative decay satisfying
 `eta * decay <= 1`.
+
+`Persistent_Epoch_Inversion.thy` proves an epoch-persistent optimizer contract:
+the first moment, effective step, and global clock carry across every block.
+Under epoch-count-independent block-length conditions, repeated `A^n T^m` and
+`T^m A^n` schedules have opposite signs at every positive epoch boundary, with
+strict epoch-independent margins. `All_Optimizer_Persistent_Inversion.thy`
+instantiates that contract for plain SGD, classical Momentum SGD, exact
+bias-corrected Adam, and AdamW; the Adam variants retain their evolving second
+moment and never reset bias-correction time.
 
 `formalization/adam/Adam_Bridge.thy` closes the two gaps that previously left
 the Adam/AdamW inversion premises unsupplied. It proves deterministic tracking
