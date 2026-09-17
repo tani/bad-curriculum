@@ -1,5 +1,5 @@
 theory Momentum_SGD_Order_Only
-  imports "../Order_Only_Inversion_Extensions"
+  imports "../core/Order_Only_Inversion_Extensions"
 begin
 
 section \<open>Momentum stochastic gradient descent\<close>

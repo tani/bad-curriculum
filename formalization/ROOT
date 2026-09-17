@@ -1,5 +1,6 @@
 session "Bad_Curriculum" = "HOL-Probability" +
   directories
+    core
     sgd
     "momentum-sgd"
     adam

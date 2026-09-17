@@ -188,6 +188,13 @@ layers:
   spaces, and deterministic prefix-discrepancy control for low-discrepancy
   schedules.
 
+Shared order-only definitions, finite-population concentration, and asymptotic
+extensions live under `formalization/core/`:
+
+- `Order_Only_Inversion.thy`
+- `Finite_Population_Hoeffding.thy`
+- `Order_Only_Inversion_Extensions.thy`
+
 Optimizer-specific entry theories live under the corresponding CLI names:
 
 - `formalization/sgd/SGD_Order_Only.thy`
@@ -239,6 +246,11 @@ uniformly random presentation order: with the uniform auxiliary bound
 pair equals `(epsilon, 1-epsilon^2)` with probability at least `1 - conf`
 over `binary_orders n N`. All of these are finite conditional theorems; the
 drift, landing and takeover inequalities remain explicit premises.
+
+`formalization/adam/Adam_Asymptotics.thy` instantiates the exact realizable
+Adam/AdamW dynamics with the integer power-law family. It proves random-order
+benign probability tends to one and attack risk/AUC tend to `(1, 0)`, with
+`rz_power_law_adam_inversion` specializing decoupled weight decay to zero.
 
 `order_only_inversion_complete_asymptotic` is unconditional: it combines the
 explicit scalar attack order, random-permutation event, realizable transfer and
