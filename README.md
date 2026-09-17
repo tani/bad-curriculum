@@ -233,6 +233,12 @@ dominance theorems `rz_attack_dominance` (`a_N < -u_N`) and
 `rz_random_metrics` conclude `realizable_test_risk`/`realizable_test_auc`
 values `(1-epsilon, 2*epsilon-epsilon^2)` for the Anchor → Tail order and
 `(epsilon, 1-epsilon^2)` for a low-discrepancy order.
+`rz_random_order_benign_probability` lifts the low-discrepancy case to a
+uniformly random presentation order: with the uniform auxiliary bound
+`UB N = N * eta * kappa^2 / eps` in the hypotheses, the realizable risk/AUC
+pair equals `(epsilon, 1-epsilon^2)` with probability at least `1 - conf`
+over `binary_orders n N`. All of these are finite conditional theorems; the
+drift, landing and takeover inequalities remain explicit premises.
 
 `order_only_inversion_complete_asymptotic` is unconditional: it combines the
 explicit scalar attack order, random-permutation event, realizable transfer and

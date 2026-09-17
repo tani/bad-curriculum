@@ -1338,6 +1338,99 @@ proof -
     by (rule realizable_test_auc_random[OF upos dominance])
 qed
 
+section \<open>Random presentation order in the realizable model\<close>
+
+text \<open>
+  The hypotheses are stated with the uniform auxiliary bound UB N, which
+  dominates the actual auxiliary margin of every presentation order, so the
+  same numeric conditions cover the whole probability space.
+\<close>
+
+theorem rz_random_order_benign_probability:
+  fixes conf delta epsilon :: real
+  assumes Npos: "0 < N" and sample_size: "n \<le> N"
+    and conf_positive: "0 < conf" and conf_at_most_one: "conf \<le> 1"
+    and drift_nonneg: "0 \<le> Abenign delta (real n / real N) N"
+    and landing: "UB N < delta - 2*eta/eps -
+      Ebenign (sqrt (real N / 2 * ln (2 * real N / conf)))"
+    and total: "UB N < Abenign delta (real n / real N) N * real N -
+      Ebenign (sqrt (real N / 2 * ln (2 * real N / conf)))"
+  shows "1 - conf \<le> uniform_probability (binary_orders n N)
+    {xs. realizable_test_risk epsilon (A (\<lambda>i. xs ! i) N) (Uc (\<lambda>i. xs ! i) N) =
+           epsilon \<and>
+         realizable_test_auc epsilon (A (\<lambda>i. xs ! i) N) (Uc (\<lambda>i. xs ! i) N) =
+           1 - epsilon^2}"
+proof -
+  let ?Omega = "binary_orders n N"
+  let ?u = "sqrt (real N / 2 * ln (2 * real N / conf))"
+  let ?bad = "{xs. ?u \<le> binary_max_centered_prefix n N xs}"
+  let ?good = "{xs. realizable_test_risk epsilon
+      (A (\<lambda>i. xs ! i) N) (Uc (\<lambda>i. xs ! i) N) = epsilon \<and>
+    realizable_test_auc epsilon
+      (A (\<lambda>i. xs ! i) N) (Uc (\<lambda>i. xs ! i) N) = 1 - epsilon^2}"
+  have bad_bound: "uniform_probability ?Omega ?bad \<le> conf"
+    by (rule uniform_binary_order_max_prefix_confidence[OF Npos
+          sample_size conf_positive conf_at_most_one])
+  have Omega_nonempty: "?Omega \<noteq> {}"
+    by (rule binary_orders_nonempty[OF sample_size])
+  have complement_probability:
+    "uniform_probability ?Omega (- ?bad) =
+      1 - uniform_probability ?Omega ?bad"
+    by (rule uniform_probability_complement[OF finite_binary_orders
+          Omega_nonempty])
+  have complement_lower: "1 - conf \<le> uniform_probability ?Omega (- ?bad)"
+    using bad_bound complement_probability by linarith
+  have event_subset: "?Omega \<inter> (- ?bad) \<subseteq> ?good"
+  proof
+    fix xs
+    assume member: "xs \<in> ?Omega \<inter> (- ?bad)"
+    have xs_order: "xs \<in> binary_orders n N" using member by simp
+    have prefix_good: "binary_max_centered_prefix n N xs < ?u"
+      using member by simp
+    have disc: "abs ((\<Sum>i<k. bool_value (xs ! i)) -
+        (real n / real N) * real k) \<le> ?u" if kN: "k \<le> N" for k
+    proof -
+      have prefix_eq: "prefix_sum (binary_innovation (real n / real N) xs) k =
+          (\<Sum>i<k. bool_value (xs ! i)) - (real n / real N) * real k"
+        by (simp add: prefix_sum_def binary_innovation_def sum_subtractf
+              mult.commute)
+      have le_max: "abs (prefix_sum (binary_innovation (real n / real N) xs) k)
+          \<le> binary_max_centered_prefix n N xs"
+        by (rule binary_innovation_prefix_le_max[OF Npos sample_size
+              xs_order kN])
+      show ?thesis using prefix_eq le_max prefix_good by simp
+    qed
+    have auxiliary: "Uc (\<lambda>i. xs ! i) N \<le> UB N"
+      by (rule rz_u_bounds(2))
+    have landing_xs: "Uc (\<lambda>i. xs ! i) N < delta - 2*eta/eps - Ebenign ?u"
+      using auxiliary landing by linarith
+    have total_xs: "Uc (\<lambda>i. xs ! i) N <
+        Abenign delta (real n / real N) N * real N - Ebenign ?u"
+      using auxiliary total by linarith
+    have risk: "realizable_test_risk epsilon
+        (A (\<lambda>i. xs ! i) N) (Uc (\<lambda>i. xs ! i) N) = epsilon"
+      by (rule rz_random_metrics(1)[where b = "\<lambda>i. xs ! i" and N = N
+            and p = "real n / real N" and Dsc = ?u and delta = delta])
+        (use Npos disc drift_nonneg landing_xs total_xs in auto)
+    have auc: "realizable_test_auc epsilon
+        (A (\<lambda>i. xs ! i) N) (Uc (\<lambda>i. xs ! i) N) = 1 - epsilon^2"
+      by (rule rz_random_metrics(2)[where b = "\<lambda>i. xs ! i" and N = N
+            and p = "real n / real N" and Dsc = ?u and delta = delta])
+        (use Npos disc drift_nonneg landing_xs total_xs in auto)
+    show "xs \<in> ?good" using risk auc by simp
+  qed
+  have event_mono:
+    "uniform_probability ?Omega (?Omega \<inter> (- ?bad)) \<le>
+      uniform_probability ?Omega ?good"
+    by (rule uniform_probability_mono[OF finite_binary_orders event_subset])
+  have normalized_complement:
+    "uniform_probability ?Omega (?Omega \<inter> (- ?bad)) =
+      uniform_probability ?Omega (- ?bad)"
+    unfolding uniform_probability_def by (simp add: Int_assoc)
+  show ?thesis
+    using complement_lower event_mono normalized_complement by linarith
+qed
+
 end
 
 end
