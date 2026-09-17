@@ -18,27 +18,32 @@ jobs:
     container:
       image: makarius/isabelle:Isabelle2025-2_X11_Latex
     steps:
-      - name: Export pinned proof-checking runtime
+      - name: Export pinned proof-checking components
         shell: bash
         run: |
           set -eu
           mkdir -p proof-runtime
           HOME_DIR=$(/home/isabelle/Isabelle/bin/isabelle getenv -b ISABELLE_HOME)
           /home/isabelle/Isabelle/bin/isabelle version
-          printf '%s\n' "$HOME_DIR"
-          tar -czf proof-runtime/isabelle-base.tar.gz --exclude=./contrib --exclude=./doc --exclude='*.ttf' --exclude='*.otf' --exclude='*.woff*' -C "$HOME_DIR" .
           tar -czf proof-runtime/isabelle-contrib.tar.gz --exclude='*.ttf' --exclude='*.otf' --exclude='*.woff*' -C "$HOME_DIR" contrib
+          split -b 250M -d proof-runtime/isabelle-contrib.tar.gz proof-runtime/contrib.part
           du -h proof-runtime/*
       - uses: actions/upload-artifact@v4
         with:
-          name: proof-runtime-base
-          path: proof-runtime/isabelle-base.tar.gz
+          name: proof-components-00
+          path: proof-runtime/contrib.part00
           compression-level: 0
           retention-days: 1
       - uses: actions/upload-artifact@v4
         with:
-          name: proof-runtime-contrib
-          path: proof-runtime/isabelle-contrib.tar.gz
+          name: proof-components-01
+          path: proof-runtime/contrib.part01
+          compression-level: 0
+          retention-days: 1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: proof-components-02
+          path: proof-runtime/contrib.part02
           compression-level: 0
           retention-days: 1
   verify:
