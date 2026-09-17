@@ -12,5 +12,6 @@ session "Bad_Curriculum" = "HOL-Probability" +
     Momentum_SGD_Order_Only
     Adam_Core
     Adam_Bridge
+    Adam_Realizable
     Adam_Order_Only
     AdamW_Order_Only

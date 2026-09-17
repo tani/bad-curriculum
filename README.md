@@ -218,6 +218,22 @@ The explicit-anchor inversion theorems
 `adamw_anchor_tail_inversion_explicit` no longer take the anchor bound as a
 premise.
 
+`formalization/adam/Adam_Realizable.thy` carries the scalar analysis over to
+the linearly realizable two-coordinate model. Adam is applied coordinate-wise
+to the original parameters `(a, theta2)`, never to the product
+`u = kappa * theta2`. The theory proves `0 < u_k` for `k > 0` and
+`u_k <= k * eta * kappa^2 / eps`, the exact gradient identity
+`g_a = sigmoid (a + s * u) - bool_value b`, and the resulting coupling slack
+`|g_a - (sigmoid a - bool_value b)| <= u / 4`. Tracking therefore holds with
+slack `Kslack + N * eta * kappa^2 / (4 * eps)`, which yields the same
+logarithmic Anchor bound (`rz_anchor_log_bound`), an interval-drift
+certificate in both directions, and through `aw_interval_barrier` the strict
+dominance theorems `rz_attack_dominance` (`a_N < -u_N`) and
+`rz_random_dominance` (`u_N < a_N`). The corollaries `rz_attack_metrics` and
+`rz_random_metrics` conclude `realizable_test_risk`/`realizable_test_auc`
+values `(1-epsilon, 2*epsilon-epsilon^2)` for the Anchor → Tail order and
+`(epsilon, 1-epsilon^2)` for a low-discrepancy order.
+
 `order_only_inversion_complete_asymptotic` is unconditional: it combines the
 explicit scalar attack order, random-permutation event, realizable transfer and
 attack metric limits, and the exact zero-momentum reference trajectory.
