@@ -26,8 +26,8 @@ jobs:
           HOME_DIR=$(/home/isabelle/Isabelle/bin/isabelle getenv -b ISABELLE_HOME)
           /home/isabelle/Isabelle/bin/isabelle version
           printf '%s\n' "$HOME_DIR"
-          tar -czhf proof-runtime/isabelle-base.tar.gz --exclude=./contrib --exclude=./doc --exclude='*.ttf' --exclude='*.otf' --exclude='*.woff*' -C "$HOME_DIR" .
-          tar -czhf proof-runtime/isabelle-contrib.tar.gz --exclude='*.ttf' --exclude='*.otf' --exclude='*.woff*' -C "$HOME_DIR" contrib
+          tar -czf proof-runtime/isabelle-base.tar.gz --exclude=./contrib --exclude=./doc --exclude='*.ttf' --exclude='*.otf' --exclude='*.woff*' -C "$HOME_DIR" .
+          tar -czf proof-runtime/isabelle-contrib.tar.gz --exclude='*.ttf' --exclude='*.otf' --exclude='*.woff*' -C "$HOME_DIR" contrib
           du -h proof-runtime/*
       - uses: actions/upload-artifact@v4
         with:
